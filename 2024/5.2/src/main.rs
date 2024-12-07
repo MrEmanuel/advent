@@ -4,11 +4,15 @@ use std::{fs::read_to_string, ops::Index};
 
 fn main() {
     let test = false;    
-    let re_order_pages = false; // False for 5.1 and true for 5.2
+    let re_order_pages = true; // False for 5.1 and true for 5.2
     // Step 1: Add all rules to an array. 
     // Step 2: For each rule A|B, get the smallest index of all B's associated with A.
     // Step 3: Move A to before the smallest index. 
     // Step 4: Repeat untill all rules are fulfilled.
+
+    
+
+
     let input_path = match test {
          true => "test_input.txt",
          false => "input.txt"
