@@ -1,7 +1,7 @@
 use std::fs::read_to_string;
 
 fn main() {
-    
+    let test = true;
     
     // Pair up the smallest number in the left list 
     // with the smallest number in the right list
@@ -12,44 +12,51 @@ fn main() {
     // Step 2. Sort the lists in order, smallest first. 
     // Step 3. Calculate absolute distance between numbers. 
     // Step 4. Add all distances. 
+    fn print_map(columns: &Vec<Vec<String>>, map_height: usize, map_width: usize, override_pos: Option<(usize,usize)>, override_string: Option<char>) {
+        for y_i in 0..map_height {
+            let mut line:Vec<String> = vec![];
+            for x_i in 0..map_width {
+                let val = columns[x_i][y_i].to_string();
+                if override_pos.is_some() && override_string.is_some() && override_pos.unwrap() == (x_i, y_i) {
+                    line.push(override_string.unwrap().to_string());
 
-    let file_path = "./input.txt";
+                } else {
+                    line.push(val);
+                }
+            }
+            println!("{}", line.join(""));
+        }
+    }
+
+    let file_path = if test {"./test_input.txt"} else {"./input.txt"};
     println!("In file {file_path}");
 
-    let mut first_array: Vec<String> = Vec::new();
-    let mut second_array: Vec<String> = Vec:: new();
+    let mut columns: Vec<Vec<String>> = vec![];
+    let mut map_height =0;
+    let mut map_width =0;
 
-    for line in read_to_string(file_path).unwrap().lines() {
-        let values: Vec<&str> = line.split_whitespace().collect();
+    for (line_index,line) in read_to_string(file_path).unwrap().lines().enumerate() {
+        // let values: Vec<&str> = line.split_whitespace().collect();
+        if line_index == 0 {
+            map_width = line.len();
+        }
+        for column_index in 0..line.len(){
+            if line_index == 0 {
+                // Create a new vec and add to columns.
+                columns.push(vec![]);
+            }
+
+            let character = line.chars().nth(column_index).unwrap();
+            columns[column_index].push(character.to_string());
+        }
         
-        first_array.push(values[0].to_string());
-        second_array.push(values[1].to_string())
     }
-    first_array.sort();
-    second_array.sort();
+    map_height = columns[0].len();
 
-    // println!("{:?}", first_array);
-    // println!("{:?}", second_array);
 
-    // let (first, _) = first_array.split_at(10);
-    // let (second, _) = second_array.split_at(10);
+    print_map(&columns, map_height, map_width, None, None);
 
-    // println!("First part of array 1: {:?}", first);
-    // println!("First part of array 2: {:?}", second);
 
-    // println!("Array 1 length: {}", first_array.len());
-    // println!("Array 2 length: {}", second_array.len());
-
-    let mut sum: u32 = 0;
-
-    for index in 0..(first_array.len()) {
-        let distance = first_array[index].parse::<u32>().unwrap().abs_diff( second_array[index].parse::<u32>().unwrap());
-        // println!("Distance: {distance}");
-        sum = sum + distance
-
-    }
-
-    println!("Sum: {sum}")
     
     
 
