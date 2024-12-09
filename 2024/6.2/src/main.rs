@@ -60,43 +60,6 @@ fn main() {
         }
     }
 
-    // fn print_map_animate(
-    //     columns: &Vec<Vec<char>>,
-    //     map_height: usize,
-    //     map_width: usize,
-    //     starting_pos: Option<(usize, usize)>,
-    //     starting_string: Option<char>,
-    // ) {
-    //     // Clear the screen and reset the cursor
-    //     print!("\x1B[2J\x1B[1;1H");
-    
-    //     for y_i in 0..map_height {
-    //         let mut line: Vec<String> = vec![];
-    //         for x_i in 0..map_width {
-    //             if let (Some((sx, sy)), Some(s_char)) = (starting_pos, starting_string) {
-    //                 if (x_i, y_i) == (sx, sy) {
-    //                     line.push(s_char.to_string());
-    //                 } else {
-    //                     let x_distance = (x_i as isize - sx as isize).abs();
-    //                     let y_distance = (y_i as isize - sy as isize).abs();
-
-    //                     if x_distance < 20 && y_distance < 20 {
-    //                         // Only show positions close to the "cursor"
-    //                         line.push(columns[x_i][y_i].to_string());
-    //                     } else {
-    //                         // Use a placeholder for distant positions
-    //                         line.push(" ".to_string());
-    //                     }
-                        
-    //                 }
-    //             } else {
-    //                 line.push(columns[x_i][y_i].to_string());
-    //             }
-    //         }
-    //         println!("{}", line.join(""));
-    //     }
-    // }
-
     fn pause_for_input() {
         let mut input = String::new();
         println!("Press Enter to continue...");
