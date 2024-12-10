@@ -2,7 +2,12 @@ use std::{collections::HashSet, fs::read_to_string, ops::Index};
 use std::{io, thread, time};
 
 fn main() {
-    let test = true;
+    let debug = false;
+    let test = false;
+    let pause_on_each_frame = false;
+    let ticker_speed = 10;
+    let viewport_width = if debug {50} else {150}; // Width of the visible grid
+    let viewport_height = if debug {30} else {130}; // Height of the visible grid
     fn get_direction(string: &char) -> (i32,i32) {
         return match string {
             'v' => (0,1),
@@ -44,7 +49,10 @@ fn main() {
     }
 
     
-    fn print_map(columns: &Vec<Vec<char>>, map_height: usize, map_width: usize, override_pos: Option<(usize,usize)>, override_string: Option<char>) {
+    let print_map = |columns: &Vec<Vec<char>>, map_height: usize, map_width: usize, override_pos: Option<(usize,usize)>, override_string: Option<char>| {
+        if !debug {
+            return
+        }
         for y_i in 0..map_height {
             let mut line:Vec<String> = vec![];
             for x_i in 0..map_width {
@@ -58,27 +66,25 @@ fn main() {
             }
             println!("{}", line.join(""));
         }
-    }
+    };
 
-    fn pause_for_input() {
+    let wait_for_input = |show_instruction: bool| {
+        if !debug {return} 
         let mut input = String::new();
-        println!("Press Enter to continue...");
+        if show_instruction {
+            println!("Press Enter to continue...");
+        }
         io::stdin().read_line(&mut input).expect("Failed to read input");
-    }
+    };
 
-    fn print_map_animate(
+    let print_map_animate =|
         columns: &Vec<Vec<char>>,
         map_height: usize,
         map_width: usize,
         starting_pos: Option<(usize, usize)>,
         starting_string: Option<char>,
-    ) {
-        let viewport_width = 50; // Width of the visible grid
-        let viewport_height = 50; // Height of the visible grid
-    
-        // Clear the screen and reset the cursor
-        print!("\x1B[2J\x1B[1;1H");
-    
+        extra_obstacle_pos: Option<Vec<(usize, usize)>>
+     | {
         if let Some((sx, sy)) = starting_pos {
             // Calculate the top-left corner of the viewport
             let start_x = if sx > viewport_width / 2 {
@@ -96,24 +102,40 @@ fn main() {
             let end_x = (start_x + viewport_width).min(map_width);
             let end_y = (start_y + viewport_height).min(map_height);
     
+            // Clear the map
+            print!("\x1B[2J\x1B[1;1H");
+            let mut line_to_print = vec![];
             for y_i in start_y..end_y {
                 let mut line: Vec<String> = vec![];
                 for x_i in start_x..end_x {
                     // If the position matches the cursor, display the override character
                     if let Some(s_char) = starting_string {
                         if (x_i, y_i) == (sx, sy) {
-                            line.push(s_char.to_string());
+                            let start_char = format!("{}{}{}","\x1b[31m", s_char.to_string(), "\x1b[39m");
+                            line.push(start_char);
                             continue;
                         }
+                    }
+                    if extra_obstacle_pos.as_ref().is_some_and(|obst_pos| obst_pos.contains(&(x_i,y_i)))  {
+                        line.push("\x1b[31m#\x1b[39m".to_string());
+                        continue;
                     }
                     // Default to the grid character
                     line.push(columns[x_i][y_i].to_string());
                 }
-                // Print the line
-                println!("{}", line.join(""));
+                // Print the new line
+                line_to_print.push( line.join(""));
+                // line_to_print.push("\n".to_string());
+                
             }
+            
+                print!("{}", line_to_print.join("\n"));
+            
         }
-    }
+        if pause_on_each_frame {
+            wait_for_input(false);
+        }
+    };
 
 
     
@@ -186,7 +208,7 @@ fn main() {
     // println!("Bounds: {map_last_x_index}, {map_last_y_index}");
 
     let mut unique_positions_visited = HashSet::new();
-    let mut positions_visited: Vec<(usize,usize)> = vec![];
+    let mut positions_visited: Vec<((usize,usize), char)> = vec![];
     let mut positions_visited_twice = HashSet::new();
     let mut while_count = 0;
     let mut prev_moved = false;
@@ -198,28 +220,15 @@ fn main() {
             positions_visited_twice.insert(starting_pos);
         }
         let last_visited_pos = positions_visited.last();
-        // if last_visited_pos.is_some() != &starting_pos {
-        //     positions_visited.push(starting_pos.clone());
-
-        // }
         if last_visited_pos.is_none() {
-            positions_visited.push(starting_pos.clone());
-        } else {
-            if last_visited_pos.unwrap() != &starting_pos {
-                positions_visited.push(starting_pos.clone());
+            positions_visited.push((starting_pos.clone(),starting_string.clone()));
+        } else { // TODO: This check is not needed when we skip starting pos in next loop?
+            if last_visited_pos.unwrap().0 != starting_pos {
+                positions_visited.push((starting_pos.clone(),starting_string.clone()));
             }
         }
         
         unique_positions_visited.insert(starting_pos.clone()); // Add starting position
-
-        // let next_is_outside_map = match (starting_pos, starting_string) {
-        //     ((_, 0), '^') => true,
-        //     ((_,index), 'v') if index == map_last_y_index =>true,
-        //     ((_,index), '>') if index == map_last_x_index =>true,
-        //     ((0, _), '<') => true,
-        //     _ => false,
-        // };
-
 
         if next_is_outside_map(starting_pos, starting_string, map_last_x_index, map_last_y_index) {
             // println!("Last position before leaving map is: {:?}", starting_pos);
@@ -261,44 +270,41 @@ fn main() {
     // For each visited position, simulate what happens if you turn right.
 
     let columns = columns;
-    let mut loop_count = 0;
-    // let debug_pos: (usize, usize) = (67, 38); //(68, 38)  (103, 40)  (54, 82)  (80, 22) (75, 12)
-    // let index_to_check = positions_visited.iter().position(|pos| *pos == debug_pos).unwrap();
+    let mut loop_found_in_simulation_no = vec![];
     let mut obstacle_positions = HashSet::new();
-    for  (index,turn_here) in positions_visited.iter().enumerate() {
+    for  (index,(turn_here, turn_here_direction)) in positions_visited.iter().enumerate() {
 
-        // if index != index_to_check { continue  } // Debug
-        // if index == 0 {
-            // Reset start values for a new "turn_here" value
+            if turn_here == &original_starting_pos {
+                continue
+            }
+
             let mut starting_pos = original_starting_pos.clone();
             let mut starting_string = original_starting_string;
-            let mut is_simulating = false;
-            let mut turn_right_positions = vec![];
-            // let mut turn_right_next = false;
-            // TODO: Figure out what to do on first spot. Skip or not?
-            // continue
-        // }
-        // println!("Simulating for turn_here position: {:?}", turn_here);
-        // Redo the same thing as in loop above.
-      
+            let mut turn_right_positions = HashSet::new();
+            let mut prev_pos = (999,999);
+            let extra_obstacle_pos = (
+                (turn_here.0 as i32).max(0) as usize,
+                (turn_here.1 as i32).max(0) as usize,
+            );
+
         let iterations = 10000;
         for i in 0..=iterations {
             let direction = get_direction(&starting_string);
             // println!("direction: {:?}", direction);
-            print_map_animate(&columns, map_height, map_width, Some(starting_pos), Some(starting_string));
-            thread::sleep(time::Duration::from_millis(1000));
+            if debug {
+                if index < 16 {
+                    continue
+                }
+                print_map_animate(&columns, map_height, map_width, Some(starting_pos), Some(starting_string), Some(vec![extra_obstacle_pos]));
+                thread::sleep(time::Duration::from_millis(ticker_speed));
+            }
             if next_is_outside_map(starting_pos, starting_string, map_last_x_index, map_last_y_index) {
-                // println!("Last position before leaving map is: {:?}", starting_pos);
-                // println!(" ");
-                // println!(" ");
+                if debug {
+                println!("\nLeaving map");
+                wait_for_input(true);
+            }
                 break
             }
-            
-            // Check for obstacles. 
-      
-            // println!("next position: {:?}, {starting_string}", next_position);
-            // Check if next_position matches turn_here .
-            // If it does, check if is_simulating
             
      
             let next_position = (
@@ -306,57 +312,46 @@ fn main() {
                 (starting_pos.1 as i32 + direction.1).max(0) as usize,
             );
 
-            let mut should_turn_right= {
+            let should_turn_right= {
                 let res = pos_is_obstacle(&columns, next_position);
                 // println!("{:?} Is obstacle: {res}", {next_position});
-                if res {
+                if res || next_position == *turn_here {
                     true
                 } else {
                     false
                 }
             };
-            // turn_right_next = false; // Reset saved state from last iteration on each iteration.
-            
-            if next_position == *turn_here {
-                pause_for_input();
-                // println!("Match {:?} == {:?}",next_position, turn_here);
-                if is_simulating {
-                    loop_count +=1;
-                    obstacle_positions.insert(next_position);
-                    break
-                    // println!("Loop found at {:?}", turn_here);
-                    // Loop found! 
-                    // println!("Count +1, breaking at {i}");
-                    // print_map(&columns, map_height, map_width, Some(*turn_here), Some(starting_string));
-                    // println!("======= Loop found at ending pos: {:?}, {starting_string}", starting_pos);
-                    
-                } else {
-                    // println!("Simulation on! Turn right, true!");
-                    is_simulating = true;
-                     should_turn_right = true;
-                    // turn_right_next = true;
-                    
 
+            if should_turn_right {
+                if debug {
+                    println!("\nShould turn right..");
+                    wait_for_input(true);
                 }
-            }
 
-            if  should_turn_right {
-                turn_right_positions.push(starting_pos);
+                let first_right_turn_count = turn_right_positions.len();
+                turn_right_positions.insert((starting_pos, starting_string));
+                let second_right_turn_count = turn_right_positions.len();
 
-                // Check if the position was repeated the 3rd latest position in turn_right_positions.
-                // println!("Last 1st turn pos : {:?}",turn_right_positions.iter().nth_back(1).unwrap_or(&(0,0)));
-                // println!("Last 2nd turn pos : {:?}",turn_right_positions.iter().nth_back(2).unwrap_or(&(0,0)));
-                // println!("Last 3rd turn pos : {:?}",turn_right_positions.iter().nth_back(3).unwrap_or(&(0,0)));
-                // println!("Last 4th turn pos : {:?}",turn_right_positions.iter().nth_back(4).unwrap_or(&(0,0)));
-                // println!("Current turn por: {:?}",&starting_pos.clone());
+                if debug {
+                    println!("{:?}",{turn_right_positions.clone()});
+                }
+                wait_for_input(true);
 
+                // Skip if last iteration was a turn.
+                let loop_found = first_right_turn_count > 0 && first_right_turn_count == second_right_turn_count && starting_pos != prev_pos;
+                prev_pos = starting_pos;
                 
-                if turn_right_positions.iter().nth_back(4).unwrap_or(&(0,0)) == &starting_pos.clone() {
-                    loop_count +=1;
-                    obstacle_positions.insert(next_position.clone());
-                    println!("Loop found! ");
-
-                    pause_for_input();
+                if loop_found {
+                    obstacle_positions.insert(extra_obstacle_pos);
+                    loop_found_in_simulation_no.push(index);
+                    if debug { 
+                        // Print added obstacle
+                        print_map_animate(&columns, map_height, map_width, Some(starting_pos), Some(starting_string), Some(vec![extra_obstacle_pos]));
+                        println!("Loop found! {} in total. simulation index {index}", loop_found_in_simulation_no.len());
+                        wait_for_input(true);
+                    }
+                    
+                    wait_for_input(true);
                     break
 
                 }
@@ -373,26 +368,36 @@ fn main() {
                 // prev_moved = true;
                 starting_pos = next_position;
             }
+            
 
             // println!("======= Ending pos: {:?}", starting_pos);
 
             if i == iterations {
 
-                println!("/////// Breaking on {i} iterations! for turn_here: {:?}", turn_here)
+                if debug {
+                    println!("/////// Breaking on {i} iterations! for turn_here: {:?}", turn_here)
+                }
+                break
             }
         }
 
 
     } 
 
-    // print_map(&columns, map_height, map_width, None, None);
-    // println!("Positions visited: {:?}", positions_visited);
-    println!("loop count: {loop_count}");
-    println!("{:?}", obstacle_positions);
+    print_map_animate(&columns, map_height, map_width, Some(original_starting_pos), Some(original_starting_string), Some(obstacle_positions.iter().map(|val| *val).collect()));
+    if debug {
+        
+        println!("Loops found in indexes: {:?}",loop_found_in_simulation_no);
+        println!("{:?}", obstacle_positions);
+    }
     println!("Obstacles count: {}", obstacle_positions.len());
+    
 
     // 35 wrong.
     // 1649 too low
     // 4819 too high
+    // 1575 is someone elses input??
+    // 379 is wrong 
+    // 1796
 
 }

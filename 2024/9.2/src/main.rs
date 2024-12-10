@@ -125,6 +125,9 @@ fn main() {
             sum = sum + index * arr[i].parse::<i64>().unwrap();
         }
     }
+
+    
+
     
     println!("sum: {sum}");
 
