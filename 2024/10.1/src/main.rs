@@ -1,9 +1,9 @@
 
-use std::collections::HashSet;
-use std::{fs::read_to_string, ops::Index};
+use std::collections::HashMap;
+use std::fs::read_to_string;
 use std::isize;
 
-use utils::{print_map, DEBUG, TEST};
+use utils::{print_map, wait_for_input, DEBUG, TEST};
     
     // What is the sum of the scores of all trailheads on your topographic map?
     // Find hiking trails.
@@ -28,16 +28,15 @@ use utils::{print_map, DEBUG, TEST};
         use std::io;
 
         pub const DEBUG: bool = false;
-        pub const TEST: bool = true;
+        pub const TEST: bool = false;
 
-        pub fn print_map(columns: &Vec<Vec<u32>>, current_pos: (usize,usize)) {
+        pub fn print_map(columns: &Vec<Vec<u32>>, current_pos: (usize,usize), override_positions: &Vec<(usize,usize)>) {
             if !DEBUG {
                 return
             }
             let map_height = columns.len();
             let map_width = columns[0].len();
     
-            println!("{},{}", map_height, map_width);
             for y_i in 0..map_height {
                 let mut line:Vec<String> = vec![];
                 for x_i in 0..map_width {
@@ -52,7 +51,7 @@ use utils::{print_map, DEBUG, TEST};
                     
                     let mut val = columns[x_i][y_i].to_string();
     
-                    if (x_i, y_i) == current_pos {
+                    if (x_i, y_i) == current_pos || override_positions.contains(&(x_i, y_i)) {
                         val = "\x1b[31m".to_string() + &val + "\x1b[39m ";
                     }
     
@@ -74,9 +73,6 @@ use utils::{print_map, DEBUG, TEST};
             for index in 0..x_y.len() {
     
                 let (x, y) = x_y[index];
-                    // println!("-----");
-                    // println!("(x,y) = ({x},{y})");
-                    // println!("(1,2) = ({},{})",start.0, start.1);
                     let x = (start.0 as isize + x) as usize;
                     let y= (start.1 as isize + y) as usize;
     
@@ -107,54 +103,48 @@ use utils::{print_map, DEBUG, TEST};
 
         pub fn walk_path<'a>(path_array: Vec<(usize,usize)>, start_pos: (isize,isize), columns: &'a Vec<Vec<u32>>, final_array: &'a mut Vec<Vec<(usize, usize)>>)-> &'a mut Vec<Vec<(usize, usize)>> {
             let start_value =columns[start_pos.0 as usize][start_pos.1 as usize];
-            if start_value == 9 {
-                println!("9 Found!");
-                
+            if start_value == 9 {                
                 // Add entire path.
                 let path_array = path_array.clone();
-                final_array.push(path_array);
+
+                // Only add path if it's not a duplicate. 
+                let mut duplicate_found = false;
+
+                for i in 0..final_array.len() {
+                    let first_last = (final_array[i].first().unwrap(), final_array[i].last().unwrap());
+                    let current_first_last = (path_array.first().unwrap(), path_array.last().unwrap());
+                    if first_last == current_first_last {
+
+                        if DEBUG {
+                            println!("Found duplicate of first and last: {:?}", first_last);
+                        }
+                        duplicate_found = true;
+                    }
+                }
+
+                if !duplicate_found {
+                    final_array.push(path_array);
+                }
                 return final_array;
             }
     
             let diff = get_diff(start_pos, &columns);
-            println!("{}", diff.len());
-                    
-         
-    
-            if diff.len() == 1 {
-                // let x = diff[0].0.0;
-                // let y = diff[0].0.1;
-                // 1. Add (x,y) to path. 
-                // 2. If length increases, keep going.
-                // println!("One path forward at {x},{y}");
-                let new_start_pos = (diff[0].0.0 as isize, diff[0].0.1 as isize).clone(); 
-                let mut path_array = path_array.clone();
-                path_array.push((diff[0].0.0 ,diff[0].0.1));
-                // println!("path array is: {:?}",path_array);
-                return walk_path(path_array,new_start_pos,&columns, final_array)
-    
-                // path.insert((x,y));
-            } else if diff.len() > 1 {
-                println!("Multiple paths forward!");
-
-                // let final_arr_multiple = vec![];
-                
+             if diff.len() > 0 {
                 for i in 0..diff.len(){
                     let mut path_array = path_array.clone();
-                    let new_pos = (diff[i].0.0 ,diff[i].0.1).clone();
-                    println!("Multi match new pos: ({},{})", new_pos.0, new_pos.1);
-                    path_array.push(new_pos);
+                    let new_start_pos = (diff[i].0.0 ,diff[i].0.1).clone();
+                    path_array.push(new_start_pos);
                     let new_start_pos = diff[i].0.clone();
-                    walk_path(path_array,(new_start_pos.0 as isize, new_start_pos.1 as isize),&columns, final_array);
-
-                    // TODO: Figure out how to match arrays.. 
+                     walk_path(path_array,(new_start_pos.0 as isize, new_start_pos.1 as isize),&columns, final_array);
                 }
                 
                 return final_array;
     
     
             } else {
-                println!("No path forward at {},{}",start_pos.0,start_pos.1 );
+                if DEBUG {
+                    println!("No path forward at {},{}",start_pos.0,start_pos.1 );
+                }
                 
                 return final_array
             }
@@ -163,77 +153,7 @@ use utils::{print_map, DEBUG, TEST};
 
     }
 
-fn main() {
-   
-    let pause_on_each_frame = false;
-    let viewport_width = if DEBUG {20} else {150}; // Width of the visible grid
-    let viewport_height = if DEBUG {10} else {130}; // Height of the visible grid
-    
-
-  
-
-    let print_map_animate =|
-        columns: &Vec<Vec<u32>>,
-        starting_pos: (usize, usize),
-        starting_string: char,
-        extra_obstacle_pos: Option<Vec<(usize, usize)>>
-     | {
-        let map_height = columns.first().iter().len();
-        let map_width = columns.first().iter().last().iter().len();
-         let (sx, sy) = starting_pos;
-            // Calculate the top-left corner of the viewport
-            let start_x = if sx > viewport_width / 2 {
-                sx - viewport_width / 2
-            } else {
-                0
-            };
-            let start_y = if sy > viewport_height / 2 {
-                sy - viewport_height / 2
-            } else {
-                0
-            };
-    
-            // Clip the viewport to the grid boundaries
-            let end_x = (start_x + viewport_width).min(map_width);
-            let end_y = (start_y + viewport_height).min(map_height);
-    
-            // Clear the map
-            print!("\x1B[2J\x1B[1;1H");
-            let mut line_to_print = vec![];
-            for y_i in start_y..end_y {
-                let mut line: Vec<String> = vec![];
-                for x_i in start_x..end_x {
-                    // If the position matches the cursor, display the override character
-                     let s_char = starting_string;
-                        if (x_i, y_i) == (sx, sy) {
-                            let start_char = format!("{}{}{}","\x1b[31m", s_char.to_string(), "\x1b[39m");
-                            line.push(start_char);
-                            continue;
-                        }
-                    
-                    if extra_obstacle_pos.as_ref().is_some_and(|obst_pos| obst_pos.contains(&(x_i,y_i)))  {
-                        line.push("\x1b[31m#\x1b[39m".to_string());
-                        continue;
-                    }
-                    // Default to the grid character
-                    line.push(columns[x_i][y_i].to_string());
-                }
-                // Print the new line
-                line_to_print.push( line.join(""));
-                // line_to_print.push("\n".to_string());
-                
-            }
-            
-                print!("{}", line_to_print.join("\n"));
-            
-        
-        if pause_on_each_frame {
-            utils::wait_for_input(false);
-        }
-    };
-
-
-    
+fn main() {   
     let file_path = if TEST {"./test_input.txt"} else {"./input.txt"};
     println!("In file {file_path}");
     let mut columns: Vec<Vec<u32>> = Vec::new();
@@ -263,9 +183,7 @@ fn main() {
         for column_index in 0..row.len() {
             // Rows and columns are created, but empty. Add the numbers.
             columns[column_index].push(row[column_index])
-           
         }
-        
     }
 
 
@@ -277,60 +195,86 @@ fn main() {
 
     if DEBUG {
         println!("Starting positons: {:?}", starting_positions);
+        wait_for_input(true);
     }
 
 
     let columns: Vec<Vec<u32>> = columns.clone();
-    let mut final_paths :Vec<Vec<(usize, usize)>> = vec![];
-    let mut start_pos_scores: Vec<((usize,usize), usize)>= vec![];
+    let mut final_paths:Vec<Vec<(usize, usize)>> = vec![];
+    let mut start_position_scores: HashMap<&(usize, usize), usize> = HashMap::new();
     for  start in starting_positions.iter() {
 
+        let path_array = vec![*start];
+        let mut final_array: Vec<Vec<(usize, usize)>> = vec![];
+        let arr: &mut Vec<Vec<(usize, usize)>> = utils::walk_path(path_array, (start.0 as isize, start.1 as isize), &columns, &mut final_array);
+        for i in 0..arr.len(){
+            if arr[i].len() == 10 {
+                if DEBUG {
+                    println!("Adding to final_paths: {:?}", arr[i]);
+                }
+
+                let start_pos_score = start_position_scores.get(start);
+
+
+                match start_pos_score {
+                    Some(score) => {
+                        start_position_scores.insert(start, score+1);
+                    },
+                    None => {
+                        start_position_scores.insert(start, 1);
+                    }
+                }
+                
+                final_paths.push(arr[i].clone());
+            }
+
+        }
 
         if DEBUG {
-            print_map(&columns, *start);
-            utils::wait_for_input(true);
+            println!("final_paths len: {}",final_paths.len());
+            println!("Start pos: {},{}", start.0, start.1);
         }
-
-        let path_array = vec![];
-        let mut final_array: Vec<Vec<(usize, usize)>> = vec![];
-        let arr = utils::walk_path(path_array, (start.0 as isize, start.1 as isize), &columns, &mut final_array);
-        let mut set = HashSet::new();
-        for i in 0..arr.len(){
-            if arr[i].len() == 9 {
-                set.insert(arr[i].clone());
-            }
-
-        }
-
         // Save final result for the start position
-        start_pos_scores.push((start.clone(),set.len()));
+        
+        wait_for_input(true);
+    }
+        if DEBUG {
+            println!("final_paths: {:?}",final_paths);
+        }
+        final_paths.sort_by(|a, b| {
+            let first = a[0].0 + a[0].1;
+            let second = b[0].0 + b[0].1;
+            first.cmp(&second)
+        });
 
-        for arr in set.iter() {
+        for arr in final_paths
+        {
             // println!("Arr #{} len: {:?}",i+1, arr.len());
-            final_paths.push(arr.clone());
+            // final_paths.push(arr.clone());
+
+            
             
             if DEBUG {
+                
+                let mut override_positions = vec![];
             for pos_index in 0..arr.len(){
+
                 // print_map_animate(&columns,arr[pos_index],'X',None);
                 // Add arrays to final_paths. 
-                print_map(&columns, (arr[pos_index].0,arr[pos_index].1));
+                println!("Start pos: ({},{}). Arr {}/{}",arr[0].0,arr[0].1, pos_index+1, arr.len());
+                print_map(&columns, (arr[pos_index].0,arr[pos_index].1), &override_positions);
                 utils::wait_for_input(true);
+                override_positions.push((arr[pos_index].0,arr[pos_index].1))
             }
         }
 
         }
 
 
-        println!("Start pos: {},{}", start.0, start.1);
-
-
-        }
-
-        println!("Final paths: {:?}", final_paths);
-
         let mut points = 0;
-        for i in 0..start_pos_scores.len() {
-            points += start_pos_scores[i].1;
+        println!("Start position scores: {:?}", start_position_scores );
+        for (_, score ) in start_position_scores {
+            points += score;
 
         }
 
