@@ -1,58 +1,35 @@
 use std::{collections::HashMap, fs::read_to_string, time::Instant};
-use utils::{get_count, DEBUG, ITERATION_COUNT, MAP_SIZE, ONLY_RUN_FIRST};
+use utils::{get_count, DEBUG, FINAL_DEPTH, ITERATION_COUNT, MAP_SIZE, ONLY_RUN_VALUE_NO};
 
 mod utils {
     use std::collections::HashMap;
-
-    pub const ONLY_RUN_FIRST: bool = false;
+    // pub const ONLY_RUN_FIRST: bool = false;
     pub const DEBUG: bool = false;
     pub const TEST: bool = true;
     pub const ITERATION_COUNT: usize = 40;
+    pub const FINAL_DEPTH: usize = 25;
     pub const MAP_SIZE: u128 = 500000;
+    pub const ONLY_RUN_VALUE_NO: usize = 1; // 0 to 7
     pub fn get_count(
         val: u128,
         depth: usize,
-        product_map: &HashMap<u128, u128>,
-        split_map: &HashMap<u128, (u128, u128)>,
+        product_map: &mut HashMap<u128, u128>,
+        split_map: &mut HashMap<u128, (u128, u128)>,
         iteration_count: usize,
     ) -> u128 {
-        // if DEBUG {
-        //     println!("=--------=====");
-        // }
-        // TODO: If it's the second last iteration, we don't need to calculate the next value.
-
         if depth == iteration_count {
-            // if DEBUG {
-            //     println!("Final count 1 for depth {depth} for val {val}")
-            // }
             return 1;
         }
-
-        // if DEBUG {
-        //     println!(
-        //         "val: {val} len is {}",
-        //         ((val as f64).log10().floor() as usize + 1)
-        //     );
-        // }
         let res = match val {
             0 => {
                 // Is zero
-                // Some(1u128)
-                // if DEBUG {
-                //     println!("Returning 1 for {val}")
-                // }
                 if depth == iteration_count - 1 {
                     return 1;
                 }
-
                 get_count(1u128, depth + 1, product_map, split_map, iteration_count)
             }
             _ if (((val as f64).log10().floor() as usize + 1) % 2) == 0 => {
-                // Is even. Split in the middle
-                // if DEBUG {
-                //     println!("Splitting {val}")
-                // }
-
+                // Is even length. Split in the middle
                 if depth == iteration_count - 1 {
                     return 2;
                 }
@@ -64,42 +41,30 @@ mod utils {
                     let (first, second) = val_string.split_at(val_string.len() / 2);
                     let first = first.parse::<u128>().unwrap();
                     let second = second.parse::<u128>().unwrap();
+
+                    // Add to answers in split_map so we don't have to calculate it again.
+                    split_map.insert(val, (first, second));
+
                     (first, second)
                 };
 
                 let count1 = get_count(first, depth + 1, product_map, split_map, iteration_count);
                 let count2 = get_count(second, depth + 1, product_map, split_map, iteration_count);
-                // if DEBUG {
-                //     println!(
-                //         "{count1} + {count2} = {} from {first} and {second} from {}",
-                //         count1 + count2,
-                //         val
-                //     )
-                // }
                 return count1 + count2;
             }
 
             val => {
-                // if DEBUG {
-                //     println!("Multiplying {val}")
-                // }
-
                 if depth == iteration_count - 1 {
                     return 1;
                 }
-
                 let product_val = if product_map.get(&val).is_some() {
                     *product_map.get(&val).unwrap()
                 } else {
-                    // if DEBUG && val < MAP_SIZE {
-                    //     println!("Error. Multiplying value {val}")
-                    // }
+                    product_map.insert(val, val * 2024);
                     val * 2024
                 };
-
                 get_count(
                     product_val,
-                    // *product_map.get(&val).unwrap_or(&(val * 2024)),
                     depth + 1,
                     product_map,
                     split_map,
@@ -107,11 +72,7 @@ mod utils {
                 )
             }
         };
-
-        // if DEBUG {
-        //     println!("Count from {val} is: {:?}", res);
-        // }
-        return res; // TODO: This is correct each time, but doesn't add up between
+        return res;
     }
 }
 fn main() {
@@ -148,45 +109,58 @@ fn main() {
 
     println!("values; {:?}", values);
 
-    for i in 1..=ITERATION_COUNT {
-        let iteration_count = i;
-        let start_values: Vec<u128> = values
-            .iter()
-            .map(|val| -> u128 { val.parse::<u128>().unwrap() })
-            .collect();
+    // for i in 1..=ITERATION_COUNT {
+    let final_depth = FINAL_DEPTH;
+    let start_values: Vec<u128> = values
+        .iter()
+        .map(|val| -> u128 { val.parse::<u128>().unwrap() })
+        .collect();
 
-        let mut count = 0;
-        for value_index in 0..values.len() {
-            if ONLY_RUN_FIRST {
-                println!(
-                    "⚠️  Warning! Skipping starting val {}",
-                    start_values[value_index]
-                );
-                if value_index > 0 {
-                    continue;
-                }
-            }
-            // Iterate through and return count for each start value.
-            count += get_count(
-                start_values[value_index],
-                0,
-                &product_map,
-                &split_map,
-                iteration_count,
+    let mut count = 0;
+    for value_index in 0..values.len() {
+        // if ONLY_RUN_VALUE_NO  {
+        //     println!(
+        //         "⚠️  Warning! Skipping starting val {}",
+        //         start_values[value_index]
+        //     );
+        //     if value_index > 0 {
+        //         continue;
+        //     }
+        // }
+
+        if value_index != ONLY_RUN_VALUE_NO {
+            println!(
+                "⚠️  Warning! Skipping starting val {}.",
+                start_values[value_index]
             );
-            if DEBUG {
-                println!("Count for value {} was: {count}", start_values[value_index]);
-            }
+            continue;
+        } else {
+            println!(
+                "Blinking {FINAL_DEPTH} times for starting val {}",
+                start_values[value_index]
+            )
         }
 
-        let duration = start.elapsed();
-        let time_per_iteration =
-            ((duration.as_secs_f64() / ITERATION_COUNT as f64) * 1000f64).floor();
-        println!(
-            "Time elapsed: {:?}s. {}ms per iteration for iteration count. {iteration_count}. Count: {count}",
+        // Iterate through and return count for each start value.
+        count += get_count(
+            start_values[value_index],
+            0,
+            &mut product_map,
+            &mut split_map,
+            final_depth,
+        );
+        if DEBUG {
+            println!("Count for value {} was: {count}", start_values[value_index]);
+        }
+    }
+
+    let duration = start.elapsed();
+    let time_per_iteration = ((duration.as_secs_f64() / ITERATION_COUNT as f64) * 1000f64).floor();
+    println!(
+            "Time elapsed: {:?}s. {}ms per iteration for iteration count. {final_depth}. Count: {count}",
             duration.as_millis()/1000, time_per_iteration
         );
-    }
+    // }
 }
 
 // 2021976/999 = 2024, i.e 999 * 2024 = 2021976
