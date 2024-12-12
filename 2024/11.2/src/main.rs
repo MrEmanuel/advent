@@ -1,15 +1,15 @@
-use std::{collections::HashMap, fs::read_to_string, time::Instant};
-use utils::{get_count, DEBUG, FINAL_DEPTH, ITERATION_COUNT, MAP_SIZE, ONLY_RUN_VALUE_NO};
+use std::{collections::HashMap, env, fs::read_to_string, time::Instant};
+use utils::{get_count, DEBUG, FINAL_DEPTH, ITERATION_COUNT, ONLY_RUN_VALUE_NO};
 
 mod utils {
     use std::collections::HashMap;
     // pub const ONLY_RUN_FIRST: bool = false;
     pub const DEBUG: bool = false;
-    pub const TEST: bool = true;
+    pub const TEST: bool = false;
     pub const ITERATION_COUNT: usize = 40;
-    pub const FINAL_DEPTH: usize = 25;
-    pub const MAP_SIZE: u128 = 500000;
-    pub const ONLY_RUN_VALUE_NO: usize = 1; // 0 to 7
+    pub const FINAL_DEPTH: usize = 75;
+    // pub const MAP_SIZE: u128 = 500000;
+    pub const ONLY_RUN_VALUE_NO: usize = 0; // 0 to 7
     pub fn get_count(
         val: u128,
         depth: usize,
@@ -43,6 +43,8 @@ mod utils {
                     let second = second.parse::<u128>().unwrap();
 
                     // Add to answers in split_map so we don't have to calculate it again.
+
+                    // println!("Adding val {val} to split_array");
                     split_map.insert(val, (first, second));
 
                     (first, second)
@@ -60,6 +62,7 @@ mod utils {
                 let product_val = if product_map.get(&val).is_some() {
                     *product_map.get(&val).unwrap()
                 } else {
+                    // println!("Adding val {val} to product_array");
                     product_map.insert(val, val * 2024);
                     val * 2024
                 };
@@ -76,6 +79,9 @@ mod utils {
     }
 }
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    println!("{:?}", args);
+    let start_value = args[1].parse::<usize>().unwrap_or(ONLY_RUN_VALUE_NO);
     let start = Instant::now();
     let file_path = if utils::TEST {
         "./test_input2.txt"
@@ -87,22 +93,22 @@ fn main() {
     let mut product_map: HashMap<u128, u128> = HashMap::new();
     let mut split_map: HashMap<u128, (u128, u128)> = HashMap::new();
 
-    for i in 1u128..MAP_SIZE {
-        if (((i as f64).log10().floor() as usize + 1) % 2) == 0 {
-            // For even numbers, populare the split_map
-            if i > 9 {
-                let val_string = i.to_string();
-                let key = val_string.parse().unwrap();
-                let (first, second) = val_string.split_at(val_string.len() / 2);
-                let first = first.parse::<u128>().unwrap();
-                let second = second.parse::<u128>().unwrap();
-                split_map.insert(key, (first, second));
-            }
-        } else {
-            // For uneven numbers, populate the product_map
-            product_map.insert(i as u128, (i as u128) * 2024);
-        }
-    }
+    // for i in 1u128..MAP_SIZE {
+    //     if (((i as f64).log10().floor() as usize + 1) % 2) == 0 {
+    //         // For even numbers, populare the split_map
+    //         if i > 9 {
+    //             let val_string = i.to_string();
+    //             let key = val_string.parse().unwrap();
+    //             let (first, second) = val_string.split_at(val_string.len() / 2);
+    //             let first = first.parse::<u128>().unwrap();
+    //             let second = second.parse::<u128>().unwrap();
+    //             split_map.insert(key, (first, second));
+    //         }
+    //     } else {
+    //         // For uneven numbers, populate the product_map
+    //         product_map.insert(i as u128, (i as u128) * 2024);
+    //     }
+    // }
 
     let content = read_to_string(file_path).unwrap();
     let values: Vec<&str> = content.split_whitespace().collect();
@@ -128,7 +134,7 @@ fn main() {
         //     }
         // }
 
-        if value_index != ONLY_RUN_VALUE_NO {
+        if value_index != start_value {
             println!(
                 "⚠️  Warning! Skipping starting val {}.",
                 start_values[value_index]
