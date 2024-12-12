@@ -152,9 +152,10 @@ fn main() {
     let map_height = columns[0].len();
     let map_width = columns.len();
     let first_starting_pos = (0, 0);
+
+    // Tiles:  char and neigbors.
     let mut tiles: HashMap<(usize, usize), (char, usize)> = HashMap::new();
     let mut regions: HashMap<(usize, usize), Vec<(usize, usize)>> = HashMap::new();
-    // Insert first position as starting point.
     regions.insert((0, 0), vec![]);
 
     let mut starting_positions = VecDeque::new();
@@ -201,6 +202,12 @@ fn main() {
 
                     if neighbors_count > 0 || starting_pos == (x, y) {
                         tiles.insert((x, y), (tile, neighbors_count));
+                        // let mut region_vec = regions.get(&starting_pos).unwrap();
+                        // region_vec.push((x, y));
+
+                        if let Some(vec) = regions.get_mut(&starting_pos) {
+                            vec.push((x, y));
+                        }
                     }
 
                     if !row_has_neighbor && neighbors_count > 0 {
@@ -238,6 +245,34 @@ fn main() {
 
         // starting_positions
     }
+
+    let mut total_cost = 0;
+    for region in regions.iter() {
+        let (pos, region) = region;
+
+        // println!("pos: {:?}, region {:?}", pos, region);
+        let area = region.len();
+        let mut char = '-';
+        let circumference: usize = region
+            .iter()
+            .map(|tile| {
+                // For each tile, calculate it's addition to the circumference
+
+                let tile_data = tiles.get(tile).unwrap();
+                char = tile_data.0;
+                4 - tile_data.1 // Return circumference.
+            })
+            .sum();
+
+        let cost = area * circumference;
+        total_cost += cost;
+        // println!(
+        //     "{:?} cost {cost}, area: {area},circumference: {circumference}",
+        //     pos
+        // )
+        println!("Region {char} with price {area} * {circumference} = {cost}",)
+    }
+    println!("Total cost: {total_cost}")
 
     // Animate map.
 
