@@ -1,12 +1,12 @@
 use std::{collections::HashMap, fs::read_to_string, time::Instant};
-use utils::{DEBUG, FINAL_DEPTH};
+use utils::{get_count, DEBUG, FINAL_DEPTH};
 
 mod utils {
+    use std::collections::HashMap;
+
     pub const DEBUG: bool = false;
     pub const TEST: bool = false;
     pub const FINAL_DEPTH: usize = 75;
-}
-fn main() {
     pub fn get_count(
         val: u128,
         depth: usize,
@@ -106,8 +106,8 @@ fn main() {
         }
         return res;
     }
-
-    let start = Instant::now();
+}
+fn main() {
     let file_path = if utils::TEST {
         "./test_input2.txt"
     } else {
@@ -132,6 +132,7 @@ fn main() {
         .collect();
 
     let mut count = 0;
+    let start = Instant::now();
     for value_index in 0..values.len() {
         // Iterate through and return count for each start value.
         count += get_count(

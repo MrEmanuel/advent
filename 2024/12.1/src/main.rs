@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, VecDeque},
     fs::read_to_string,
 };
-use utils::{count_neighbors, print_map_animate, TEST};
+use utils::{count_neighbors, print_map_animate, DEBUG, TEST};
 
 mod utils {
     use std::{collections::HashMap, io, isize, thread, time};
@@ -14,8 +14,8 @@ mod utils {
     pub const PAUSE_ON_EACH_FRAME: bool = true;
     const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
     fn is_within_bounds(x: isize, y: isize, map_height: usize, map_width: usize) -> bool {
-        let x_ok = x.is_positive() && x < map_width as isize;
-        let y_ok = y.is_positive() && y < map_height as isize;
+        let x_ok = x >= 0 && x < map_width as isize;
+        let y_ok = y >= 0 && y < map_height as isize;
         return y_ok && x_ok;
     }
     pub fn count_neighbors(mark: char, pos: (usize, usize), columns: &Vec<Vec<char>>) -> usize {
@@ -77,7 +77,7 @@ mod utils {
         let end_y = (start_y + VIEWPORT_HEIGHT).min(map_height);
 
         // Clear the map
-        print!("\x1B[2J\x1B[1;1H");
+        // print!("\x1B[2J\x1B[1;1H");
         let mut line_to_print = vec![];
         for y_i in start_y..end_y {
             let mut line: Vec<String> = vec![];
@@ -117,7 +117,7 @@ mod utils {
             // line_to_print.push("\n".to_string());
         }
 
-        print!("{}", line_to_print.join("\n"));
+        println!("{}", line_to_print.join("\n"));
         if PAUSE_ON_EACH_FRAME {
             wait_for_input(false);
         }
@@ -135,7 +135,7 @@ fn main() {
     // When you encounter a row without any neighbors, break and start over.
 
     let file_path = if TEST {
-        "./test_input.txt"
+        "./test_input2.txt"
     } else {
         "./input.txt"
     };
@@ -152,9 +152,6 @@ fn main() {
     let map_height = columns[0].len();
     let map_width = columns.len();
     let first_starting_pos = (0, 0);
-
-    //
-
     let mut tiles: HashMap<(usize, usize), (char, usize)> = HashMap::new();
     let mut regions: HashMap<(usize, usize), Vec<(usize, usize)>> = HashMap::new();
     // Insert first position as starting point.
@@ -164,18 +161,27 @@ fn main() {
     starting_positions.push_back(first_starting_pos);
 
     while !starting_positions.is_empty() {
+        if DEBUG {
+            println!("Starting positions: {:?}", starting_positions);
+        }
         let mut next_start_pos_found = false;
         let starting_pos = starting_positions.pop_front().unwrap();
-        let starting_string = columns[first_starting_pos.0][first_starting_pos.1];
+        let starting_string = columns[starting_pos.0][starting_pos.1];
         for y in 0..map_height {
             if y < starting_pos.1 {
                 // Skip until starting pos.
+                if DEBUG {
+                    print!("y {y} < starting_pos.1, skipping.. ")
+                }
                 continue;
             }
 
             let mut row_has_neighbor = false;
             for x in 0..map_width {
-                if x < starting_pos.0 {
+                if y == starting_pos.1 && x < starting_pos.0 {
+                    if DEBUG {
+                        print!("x {x} < starting_pos.0, skipping.. ")
+                    }
                     // Skip until starting pos.
                     continue;
                 }
@@ -183,14 +189,31 @@ fn main() {
                 let tile = columns[x][y];
                 let same_region = starting_string == tile;
 
+                if DEBUG {
+                    println!("Same region: {same_region}");
+                }
+
                 if same_region {
                     let neighbors_count = count_neighbors(starting_string, (x, y), &columns);
-                    tiles.insert((x, y), (tile, neighbors_count));
+                    if DEBUG {
+                        println!("neighbors_count: {neighbors_count}");
+                    }
+
+                    if neighbors_count > 0 || starting_pos == (x, y) {
+                        tiles.insert((x, y), (tile, neighbors_count));
+                    }
 
                     if !row_has_neighbor && neighbors_count > 0 {
                         row_has_neighbor = true;
                     }
-                } else if !next_start_pos_found {
+                } else if !next_start_pos_found && !tiles.contains_key(&(x, y)) {
+                    if DEBUG {
+                        println!(
+                            "Setting next starting position: {:?}, {}",
+                            (x, y),
+                            columns[x][y]
+                        )
+                    }
                     next_start_pos_found = true;
                     starting_positions.push_back((x, y));
                     regions.insert((x, y), vec![]);
@@ -206,6 +229,7 @@ fn main() {
                 );
             }
             if !row_has_neighbor {
+                print!("ROw has no neightbors..");
                 // If row has no neighbor,
                 // break and start with the next starting point.
                 break;
