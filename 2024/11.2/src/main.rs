@@ -6,7 +6,7 @@ mod utils {
 
     pub const ONLY_RUN_FIRST: bool = false;
     pub const DEBUG: bool = false;
-    pub const TEST: bool = false;
+    pub const TEST: bool = true;
     pub const ITERATION_COUNT: usize = 40;
     pub const MAP_SIZE: u128 = 500000;
     pub fn get_count(
@@ -16,36 +16,45 @@ mod utils {
         split_map: &HashMap<u128, (u128, u128)>,
         iteration_count: usize,
     ) -> u128 {
-        if DEBUG {
-            println!("=--------=====");
-        }
+        // if DEBUG {
+        //     println!("=--------=====");
+        // }
         // TODO: If it's the second last iteration, we don't need to calculate the next value.
+
         if depth == iteration_count {
-            if DEBUG {
-                println!("Final count 1 for depth {depth} for val {val}")
-            }
+            // if DEBUG {
+            //     println!("Final count 1 for depth {depth} for val {val}")
+            // }
             return 1;
         }
 
-        if DEBUG {
-            println!(
-                "val: {val} len is {}",
-                ((val as f64).log10().floor() as usize + 1)
-            );
-        }
+        // if DEBUG {
+        //     println!(
+        //         "val: {val} len is {}",
+        //         ((val as f64).log10().floor() as usize + 1)
+        //     );
+        // }
         let res = match val {
             0 => {
                 // Is zero
                 // Some(1u128)
-                if DEBUG {
-                    println!("Returning 1 for {val}")
+                // if DEBUG {
+                //     println!("Returning 1 for {val}")
+                // }
+                if depth == iteration_count - 1 {
+                    return 1;
                 }
+
                 get_count(1u128, depth + 1, product_map, split_map, iteration_count)
             }
             _ if (((val as f64).log10().floor() as usize + 1) % 2) == 0 => {
                 // Is even. Split in the middle
-                if DEBUG {
-                    println!("Splitting {val}")
+                // if DEBUG {
+                //     println!("Splitting {val}")
+                // }
+
+                if depth == iteration_count - 1 {
+                    return 2;
                 }
 
                 let (first, second): (u128, u128) = if split_map.get(&val).is_some() {
@@ -60,26 +69,31 @@ mod utils {
 
                 let count1 = get_count(first, depth + 1, product_map, split_map, iteration_count);
                 let count2 = get_count(second, depth + 1, product_map, split_map, iteration_count);
-                if DEBUG {
-                    println!(
-                        "{count1} + {count2} = {} from {first} and {second} from {}",
-                        count1 + count2,
-                        val
-                    )
-                }
+                // if DEBUG {
+                //     println!(
+                //         "{count1} + {count2} = {} from {first} and {second} from {}",
+                //         count1 + count2,
+                //         val
+                //     )
+                // }
                 return count1 + count2;
             }
 
             val => {
-                if DEBUG {
-                    println!("Multiplying {val}")
+                // if DEBUG {
+                //     println!("Multiplying {val}")
+                // }
+
+                if depth == iteration_count - 1 {
+                    return 1;
                 }
+
                 let product_val = if product_map.get(&val).is_some() {
                     *product_map.get(&val).unwrap()
                 } else {
-                    if DEBUG && val < MAP_SIZE {
-                        println!("Error. Multiplying value {val}")
-                    }
+                    // if DEBUG && val < MAP_SIZE {
+                    //     println!("Error. Multiplying value {val}")
+                    // }
                     val * 2024
                 };
 
@@ -94,9 +108,9 @@ mod utils {
             }
         };
 
-        if DEBUG {
-            println!("Count from {val} is: {:?}", res);
-        }
+        // if DEBUG {
+        //     println!("Count from {val} is: {:?}", res);
+        // }
         return res; // TODO: This is correct each time, but doesn't add up between
     }
 }
