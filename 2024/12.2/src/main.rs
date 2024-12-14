@@ -6,11 +6,11 @@ use utils::{
 mod utils {
     use std::{io, isize, thread, time};
     pub const TICKER_SPEED: u64 = 40;
-    pub const DEBUG: bool = true;
+    pub const DEBUG: bool = false;
     pub const TEST: bool = true;
     pub const VIEWPORT_HEIGHT: usize = 30;
     pub const VIEWPORT_WIDTH: usize = 30;
-    pub const PAUSE_ON_EACH_FRAME: bool = true;
+    pub const PAUSE_ON_EACH_FRAME: bool = false;
     pub const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
     pub fn is_within_bounds(x: isize, y: isize, map_height: usize, map_width: usize) -> bool {
         let x_ok = x >= 0 && x < map_width as isize;
@@ -65,7 +65,7 @@ mod utils {
         show_starting_pos: bool,
         starting_string: char,
         colored_secondary_positions: &Vec<(usize, usize)>,
-        colored_positions: &Vec<(usize, usize)>,
+        colored_positions: &Vec<(isize, isize)>,
     ) {
         let (sx, sy) = starting_pos;
         // Calculate the top-left corner of the viewport
@@ -103,7 +103,7 @@ mod utils {
                     ));
                     continue;
                 }
-                if colored_positions.contains(&(x_i, y_i)) {
+                if colored_positions.contains(&(x_i as isize, y_i as isize)) {
                     line.push("\x1b[31m".to_string() + &columns[x_i][y_i].to_string() + "\x1b[39m");
                     continue;
                 }
@@ -147,7 +147,7 @@ fn main() {
     //
 
     let file_path = if TEST {
-        "./test_input2.txt"
+        "./test_input.txt"
     } else {
         "./input.txt"
     };
@@ -319,20 +319,162 @@ fn main() {
         &vec![],
     );
 
-    let mark_to_check = 'R';
+    let get_position_cost = |pos: &RegionPosData,
+                             col_index: usize,
+                             row_index: usize,
+                             direction: (isize, isize),
+                             sides: &mut Vec<(isize, isize)>,
+                             sides_count: &mut usize,
+                             region_tiles: &Vec<(usize, usize)>| {
+        // if let Some(pos) = tiles_data.get(&(col_index, row_index)) {
+        // If position is in the region..
+        let mark = columns[col_index][row_index];
+        // let neighbors = get_neighbors(
+        //     columns[col_index][row_index],
+        //     (col_index, row_index),
+        //     &columns,
+        // );
+        // let tile_to_check = (col_index+ direction.0, col_index + direction.1);
+        let tile_to_check = (
+            col_index as isize + direction.0,
+            row_index as isize + direction.1,
+        );
+
+        let prev_tile = sides.last();
+        // println!(
+        //     "Checking direction {}: {:?}.  Mark {}. tile_to_check: {:?} prev_tile: {:?}",
+        //     DIRECTIONS.iter().position(|dir| dir == &direction).unwrap(),
+        //     direction,
+        //     pos.mark,
+        //     tile_to_check,
+        //     prev_tile,
+        // );
+        // wait_for_input(false);
+        if is_within_bounds(
+            tile_to_check.0,
+            tile_to_check.1,
+            columns.len(),
+            columns[0].len(),
+        ) {
+            // If tile_to_check is not a neighbor (the same mark), a new edge is found.
+            if mark != columns[tile_to_check.0 as usize][tile_to_check.1 as usize] {
+                // Check sides.last() if it is on the same row, and if it is next to tile_to_check
+
+                if let Some(prev_tile) = prev_tile {
+                    // TODO: on_same_row and is_neighbor works different for vertical and horizontal checks.
+                    // direction
+                    let (on_same_row, is_neighbor) = match direction {
+                        (0, _) => (
+                            tile_to_check.1 == prev_tile.1,
+                            (tile_to_check.0 - prev_tile.0 as isize).abs() == 1,
+                        ),
+                        (_, 0) => (
+                            tile_to_check.0 == prev_tile.0,
+                            (tile_to_check.1 - prev_tile.1 as isize).abs() == 1,
+                        ),
+                        _ => unreachable!("Direction mismatch!"),
+                    };
+
+                    // let on_same_row = tile_to_check.1 == prev_tile.1;
+                    // let is_neighbor = (tile_to_check.0 - prev_tile.0).abs() == 1;
+
+                    if DEBUG {
+                        println!(
+                            "direction {:?} prev tile: {:?}, tile_to_check: {:?}. same row: {}, is_neighbor: {}. Adding count: {}, side count: {}",direction,
+                            prev_tile, tile_to_check, on_same_row, is_neighbor, (!on_same_row || !is_neighbor),sides_count
+                        );
+                    }
+                    if !on_same_row || !is_neighbor {
+                        *sides_count += 1;
+                    }
+                } else {
+                    *sides_count += 1;
+                }
+                sides.push((tile_to_check.0 as isize, tile_to_check.1 as isize));
+
+                if DEBUG {
+                    println!("Sides count:{sides_count}");
+                    print_map_animate(
+                        &columns,
+                        map_height,
+                        map_width,
+                        // (0, 0),
+                        (tile_to_check.0 as usize, tile_to_check.1 as usize),
+                        true,
+                        columns[tile_to_check.0 as usize][tile_to_check.1 as usize],
+                        &region_tiles,
+                        &sides,
+                    );
+                }
+            }
+        } else {
+            // Outside of bounds, means adding a boundry.
+            // println!(
+            //     "Outside boundry.. Checking direction {}: {:?}.  Mark {}. tile_to_check: {:?} prev_tile: {:?}",
+            //     DIRECTIONS.iter().position(|dir| dir == &direction).unwrap(),
+            //     direction,
+            //     pos.mark,
+            //     tile_to_check,
+            //     prev_tile,
+            // );
+            // wait_for_input(false);
+            // let prev_tile = sides.last();
+            if let Some(prev_tile) = prev_tile {
+                // TODO: on_same_row and is_neighbor works different for vertical and horizontal checks.
+                // direction
+                let (on_same_row, is_neighbor) = match direction {
+                    (0, _) => (
+                        tile_to_check.1 == prev_tile.1,
+                        (tile_to_check.0 - prev_tile.0 as isize).abs() == 1,
+                    ),
+                    (_, 0) => (
+                        tile_to_check.0 == prev_tile.0,
+                        (tile_to_check.1 - prev_tile.1 as isize).abs() == 1,
+                    ),
+                    _ => unreachable!("Direction mismatch!"),
+                };
+
+                // println!(
+                //     "{} == {} and {} - {} for direction: {:?}",
+                //     tile_to_check.1, prev_tile.1, tile_to_check.0, prev_tile.0, direction
+                // );
+                println!(
+                    "direction {:?} prev tile: {:?}, tile_to_check: {:?}. same row: {}, is_neighbor: {}. Adding count: {}, side count: {}",direction,
+                    prev_tile, tile_to_check, on_same_row, is_neighbor, (!on_same_row || !is_neighbor),sides_count
+                );
+                print_map_animate(
+                    &columns,
+                    map_height,
+                    map_width,
+                    // (0, 0),
+                    pos.pos,
+                    true,
+                    pos.mark,
+                    &region_tiles,
+                    &sides,
+                );
+                wait_for_input(false);
+                if !on_same_row || !is_neighbor {
+                    *sides_count += 1;
+                }
+            } else {
+                *sides_count += 1;
+            }
+            sides.push((tile_to_check.0 as isize, tile_to_check.1 as isize));
+            // *sides_count += 1;
+        }
+        // }
+    };
+
+    let mark_to_check = 'C';
     let mut regions_costs: HashMap<(usize, usize), (char, usize)> = HashMap::new();
     for (_index, (pos, tiles_data)) in regions.into_iter().enumerate() {
         if DEBUG {
             if mark_to_check != columns[pos.0][pos.1] {
                 continue;
             }
-
-            // if index > 0 {
-            //     break;
-            // }
         }
 
-        println!("Tiles data; {:?}", tiles_data.keys());
         let region_tiles: Vec<(usize, usize)> = tiles_data.keys().map(|pos| *pos).collect();
         // Get the highest x and y value for the region.
         let x_max = tiles_data.keys().max_by(|a, b| a.0.cmp(&b.0));
@@ -341,11 +483,13 @@ fn main() {
         let x_min = tiles_data.keys().min_by(|a, b| a.0.cmp(&b.0));
         let y_min = tiles_data.keys().min_by(|a, b| a.1.cmp(&b.1));
 
-        println!("============");
-        println!(
-            "For region {:?}, x min: {:?}, y min: {:?}, x max: {:?}, y max: {:?}",
-            columns[pos.0][pos.1], x_min, y_min, x_max, y_max
-        );
+        if DEBUG {
+            println!("============");
+            println!(
+                "For region {:?}, x min: {:?}, y min: {:?}, x max: {:?}, y max: {:?}",
+                columns[pos.0][pos.1], x_min, y_min, x_max, y_max
+            );
+        }
 
         // for rotation in [
         //     (-DIRECTIONS[0].1, DIRECTIONS[0].0),
@@ -353,95 +497,158 @@ fn main() {
         //     ((-DIRECTIONS[2].1, DIRECTIONS[2].0)),
         //     ((-DIRECTIONS[3].1, DIRECTIONS[3].0)),
         // ] {
-        let direction = DIRECTIONS[3];
 
-        let mut sides: Vec<(usize, usize)> = vec![];
-        let mut sides_count = 0;
+        ///////////////////////////////////
+        // First direction.
+        ///////////////////////////////////
+        let direction = DIRECTIONS[3];
+        let mut sides: Vec<(isize, isize)> = vec![];
+        let mut sides_count: usize = 0;
         for col_index in 0..columns.len() {
+            for row_index in 0..columns[col_index].len() {
+                // Count the number of non-neighbors in a row. Increment count if there is a gap.
+                if let Some(pos) = tiles_data.get(&(col_index, row_index)) {
+                    get_position_cost(
+                        pos,
+                        col_index,
+                        row_index,
+                        direction,
+                        &mut sides,
+                        &mut sides_count,
+                        &region_tiles,
+                    );
+                }
+            }
+        }
+        if DEBUG {
+            println!("First direction sides count: {}", sides_count);
+        }
+
+        // regions_costs
+        //     .entry(pos)
+        //     .and_modify(|map| {
+        //         map.insert(pos, (columns[pos.0][pos.1], sides_count));
+        //     })
+        //     .or_insert_with(HashMap::new)
+        //     .insert(pos, (columns[pos.0][pos.1], sides_count));
+
+        regions_costs
+            .entry(pos)
+            .and_modify(|(_char, size)| {
+                *size += sides_count;
+            })
+            .or_insert((columns[pos.0][pos.1], sides_count));
+        // regions_costs.insert(pos, (columns[pos.0][pos.1], sides_count));
+        ///////////////////////////////////
+        // Second direction.
+        ///////////////////////////////////
+        let direction = DIRECTIONS[2];
+        let mut sides: Vec<(isize, isize)> = vec![];
+        let mut sides_count: usize = 0;
+        for col_index in (0..columns.len()).rev() {
+            for row_index in (0..columns[col_index].len()).rev() {
+                // Count the number of non-neighbors in a row. Increment count if there is a gap.
+
+                if let Some(pos) = tiles_data.get(&(col_index, row_index)) {
+                    // println!("Second col_index {}, row_index:{}", col_index, row_index);
+                    get_position_cost(
+                        pos,
+                        col_index,
+                        row_index,
+                        direction,
+                        &mut sides,
+                        &mut sides_count,
+                        &region_tiles,
+                    );
+                }
+            }
+        }
+        if DEBUG {
+            println!("Second direction sides count: {}", sides_count);
+        }
+        regions_costs
+            .entry(pos)
+            .and_modify(|(_char, size)| {
+                *size += sides_count;
+            })
+            .or_insert((columns[pos.0][pos.1], sides_count));
+
+        ///////////////////////////////////
+        // Third direction.
+        ///////////////////////////////////
+        let direction = DIRECTIONS[0];
+        let mut sides: Vec<(isize, isize)> = vec![];
+        let mut sides_count: usize = 0;
+        for col_index in 0..columns.len() {
+            for row_index in (0..columns[col_index].len()).rev() {
+                // Count the number of non-neighbors in a row. Increment count if there is a gap.
+
+                if let Some(pos) = tiles_data.get(&(col_index, row_index)) {
+                    // println!("Third col_index {}, row_index:{}", col_index, row_index);
+                    get_position_cost(
+                        pos,
+                        col_index,
+                        row_index,
+                        direction,
+                        &mut sides,
+                        &mut sides_count,
+                        &region_tiles,
+                    );
+                }
+            }
+        }
+        if DEBUG {
+            println!("Third direction sides count: {}", sides_count);
+        }
+        regions_costs
+            .entry(pos)
+            .and_modify(|(_char, size)| {
+                *size += sides_count;
+            })
+            .or_insert((columns[pos.0][pos.1], sides_count));
+
+        ///////////////////////////////////
+        // Forth direction.
+        ///////////////////////////////////
+        let direction = DIRECTIONS[1];
+        let mut sides: Vec<(isize, isize)> = vec![];
+        let mut sides_count: usize = 0;
+        for col_index in (0..columns.len()).rev() {
             for row_index in 0..columns[col_index].len() {
                 // Count the number of non-neighbors in a row. Increment count if there is a gap.
 
                 if let Some(pos) = tiles_data.get(&(col_index, row_index)) {
-                    // If position is in the region..
-                    let mark = columns[col_index][row_index];
-                    // let neighbors = get_neighbors(
-                    //     columns[col_index][row_index],
-                    //     (col_index, row_index),
-                    //     &columns,
-                    // );
-                    // let tile_to_check = (col_index+ direction.0, col_index + direction.1);
-                    let tile_to_check = (
-                        col_index as isize + direction.0,
-                        row_index as isize + direction.1,
+                    // println!("Forth col_index {}, row_index:{}", col_index, row_index);
+                    get_position_cost(
+                        pos,
+                        col_index,
+                        row_index,
+                        direction,
+                        &mut sides,
+                        &mut sides_count,
+                        &region_tiles,
                     );
-
-                    println!(
-                        "Checking direction {:?}. Neighbor of {} {:?} tile. Neighbor: {:?}",
-                        direction, pos.mark, pos.pos, tile_to_check,
-                    );
-                    // wait_for_input(false);
-                    if is_within_bounds(
-                        tile_to_check.0,
-                        tile_to_check.1,
-                        columns.len(),
-                        columns[0].len(),
-                    ) {
-                        if DEBUG {
-                            println!("{:?}Is is within bounds.", tile_to_check);
-                        }
-                        // If tile_to_check is not a neighbor (the same mark), a new edge is found.
-                        if mark != columns[tile_to_check.0 as usize][tile_to_check.1 as usize] {
-                            // Check sides.last() if it is on the same row, and if it is next to tile_to_check
-                            println!("Sides: {:?}", sides);
-                            let prev_tile = sides.last();
-
-                            println!("prev tile: {:?}", prev_tile);
-                            if let Some(prev_tile) = prev_tile {
-                                let on_same_row = tile_to_check.0 as usize == prev_tile.0;
-                                let is_neighbor =
-                                    (tile_to_check.1 - prev_tile.1 as isize).abs() == 1;
-
-                                println!(
-                                    "prev tile: {:?}, tile_to_check: {:?}. same row: {}, is_neighbor: {}",
-                                    prev_tile, tile_to_check, on_same_row, is_neighbor
-                                );
-
-                                if !on_same_row || !is_neighbor {
-                                    sides_count += 1;
-                                }
-                            } else {
-                                sides_count += 1;
-                            }
-
-                            println!("Adding tile_to_check to sides: {:?} ", tile_to_check);
-                            sides.push((tile_to_check.0 as usize, tile_to_check.1 as usize));
-                            println!("sides after push: {:?}", sides);
-
-                            if DEBUG {
-                                print_map_animate(
-                                    &columns,
-                                    map_height,
-                                    map_width,
-                                    // (0, 0),
-                                    (tile_to_check.0 as usize, tile_to_check.1 as usize),
-                                    true,
-                                    columns[tile_to_check.0 as usize][tile_to_check.1 as usize],
-                                    &region_tiles,
-                                    &sides,
-                                );
-                            }
-                        }
-                    }
                 }
             }
         }
-        println!("sides count: {}", sides_count);
-        regions_costs.insert(pos, (columns[pos.0][pos.1], sides_count));
+        if DEBUG {
+            println!("Forth direction sides count: {}", sides_count);
+        }
+        regions_costs
+            .entry(pos)
+            .and_modify(|(_char, size)| {
+                *size += sides_count;
+            })
+            .or_insert((columns[pos.0][pos.1], sides_count));
     }
 
+    let mut total = 0;
     for (mark, cost) in regions_costs.values() {
-        println!("{mark}, {cost}");
+        println!("Mark {mark} cost: {cost}");
+        total += cost;
     }
+
+    println!("Total cost: {total}")
 
     // println!("\n\n\n\n\n\n\n\n");
     // print_map_animate(
