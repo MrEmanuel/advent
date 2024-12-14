@@ -1,16 +1,18 @@
-use std::{collections::HashMap, fs::read_to_string};
-use utils::{get_neighbors, print_map_animate, DEBUG, TEST};
+use std::{collections::HashMap, fs::read_to_string, ops::Index};
+use utils::{
+    get_neighbors, is_within_bounds, print_map_animate, wait_for_input, DEBUG, DIRECTIONS, TEST,
+};
 
 mod utils {
     use std::{io, isize, thread, time};
     pub const TICKER_SPEED: u64 = 40;
-    pub const DEBUG: bool = false;
-    pub const TEST: bool = false;
+    pub const DEBUG: bool = true;
+    pub const TEST: bool = true;
     pub const VIEWPORT_HEIGHT: usize = 30;
     pub const VIEWPORT_WIDTH: usize = 30;
     pub const PAUSE_ON_EACH_FRAME: bool = true;
-    const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
-    fn is_within_bounds(x: isize, y: isize, map_height: usize, map_width: usize) -> bool {
+    pub const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
+    pub fn is_within_bounds(x: isize, y: isize, map_height: usize, map_width: usize) -> bool {
         let x_ok = x >= 0 && x < map_width as isize;
         let y_ok = y >= 0 && y < map_height as isize;
         return y_ok && x_ok;
@@ -60,6 +62,7 @@ mod utils {
         map_height: usize,
         map_width: usize,
         starting_pos: (usize, usize),
+        show_starting_pos: bool,
         starting_string: char,
         colored_secondary_positions: &Vec<(usize, usize)>,
         colored_positions: &Vec<(usize, usize)>,
@@ -84,14 +87,14 @@ mod utils {
         // Clear the map
 
         if !PAUSE_ON_EACH_FRAME {
-            print!("\x1B[2J\x1B[1;1H");
+            // print!("\x1B[2J\x1B[1;1H");
         }
         let mut line_to_print = vec![];
         for y_i in start_y..end_y {
             let mut line: Vec<String> = vec![];
             for x_i in start_x..end_x {
                 // If the position matches the cursor, display the override character
-                if (y_i, x_i) == (sx, sy) {
+                if show_starting_pos && (x_i, y_i) == (sx, sy) {
                     line.push(format!(
                         "{}{}{}",
                         "\x1b[1;31m",
@@ -100,16 +103,16 @@ mod utils {
                     ));
                     continue;
                 }
-                if colored_positions.contains(&(y_i, x_i)) {
-                    line.push("\x1b[31m".to_string() + &columns[y_i][x_i].to_string() + "\x1b[39m");
+                if colored_positions.contains(&(x_i, y_i)) {
+                    line.push("\x1b[31m".to_string() + &columns[x_i][y_i].to_string() + "\x1b[39m");
                     continue;
                 }
-                if colored_secondary_positions.contains(&(y_i, x_i)) {
-                    line.push("\x1b[32m".to_string() + &columns[y_i][x_i].to_string() + "\x1b[39m");
+                if colored_secondary_positions.contains(&(x_i, y_i)) {
+                    line.push("\x1b[32m".to_string() + &columns[x_i][y_i].to_string() + "\x1b[39m");
                     continue;
                 }
                 // Default to the grid character
-                line.push(columns[y_i][x_i].to_string());
+                line.push(columns[x_i][y_i].to_string());
             }
             // Print the new line
             line_to_print.push(line.join(""));
@@ -151,12 +154,16 @@ fn main() {
     println!("In file {file_path}");
     let mut columns: Vec<Vec<char>> = Vec::new();
 
-    for line in read_to_string(file_path).unwrap().lines() {
-        let mut row = vec![];
-        for char in line.chars() {
-            row.push(char);
+    for (row_index, line) in read_to_string(file_path).unwrap().lines().enumerate() {
+        if row_index == 0 {
+            for _ in 0..line.len() {
+                columns.push(vec![]);
+            }
         }
-        columns.push(row);
+        for (column_index, char) in line.chars().enumerate() {
+            columns[column_index].push(char);
+        }
+        // columns.push(row);
     }
     let map_height = columns[0].len();
     let map_width = columns.len();
@@ -202,20 +209,22 @@ fn main() {
 
         if DEBUG {
             println!("Current mark: {current_mark}");
-            print_map_animate(
-                &columns,
-                map_height,
-                map_width,
-                current_pos,
-                current_mark,
-                &processed_tiles,
-                &regions
-                    .get(&current_start_position)
-                    .unwrap()
-                    .iter()
-                    .map(|(&key, _)| key)
-                    .collect(),
-            );
+
+            //
+            // print_map_animate(
+            //     &columns,
+            //     map_height,
+            //     map_width,
+            //     current_pos,
+            //     current_mark,
+            //     &processed_tiles,
+            //     &regions
+            //         .get(&current_start_position)
+            //         .unwrap()
+            //         .iter()
+            //         .map(|(&key, _)| key)
+            //         .collect(),
+            // );
         }
         processed_tiles.push(current_pos); // Add to processed_tiles so it doesn't get added as a starting point for a new region.
         let (neighbors, _out_of_bounds_count) = get_neighbors(current_mark, current_pos, &columns);
@@ -290,33 +299,163 @@ fn main() {
         }
     }
 
-    let mut total_cost = 0;
-    for region in regions.iter() {
-        let (_pos, region) = region;
+    println!("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 
-        // println!("pos: {:?}, region {:?}", pos, region);
-        let mut area = 0;
-        let mut char: char = '-';
-        let mut perimiter = 0;
-        region.iter().for_each(|(_, data)| {
-            // For each tile, calculate it's addition to the circumference
-            if DEBUG {
-                println!(
-                    "Tile {}, pos:{:?}, count: {}",
-                    data.mark, data.pos, data.parimiter_count
-                );
-            }
-            // let tile_data = tiles.get(tile).unwrap();
-            area += 1;
-            char = data.mark;
-            perimiter += data.parimiter_count;
-        });
+    // 1. Disregard any position without neighbors.
+    // 2. Sort the region tiles.
+    // 3. Count the sides by going line by line, and column by column.
+    // Only count one of the sides, moving forward. Always count first and last sides.
+    // Up -> down, down-> up. Left-> right, right -> left
 
-        let cost = area * perimiter;
-        total_cost += cost;
+    println!("Using file: {file_path}");
+    print_map_animate(
+        &columns,
+        map_height,
+        map_width,
+        (0, 0),
+        false,
+        columns[0][0],
+        &vec![],
+        &vec![],
+    );
+
+    let mark_to_check = 'R';
+    let mut regions_costs: HashMap<(usize, usize), (char, usize)> = HashMap::new();
+    for (_index, (pos, tiles_data)) in regions.into_iter().enumerate() {
         if DEBUG {
-            println!("Region {char} with price {area} * {perimiter} = {cost}")
+            if mark_to_check != columns[pos.0][pos.1] {
+                continue;
+            }
+
+            // if index > 0 {
+            //     break;
+            // }
         }
+
+        println!("Tiles data; {:?}", tiles_data.keys());
+        let region_tiles: Vec<(usize, usize)> = tiles_data.keys().map(|pos| *pos).collect();
+        // Get the highest x and y value for the region.
+        let x_max = tiles_data.keys().max_by(|a, b| a.0.cmp(&b.0));
+        let y_max = tiles_data.keys().max_by(|a, b| a.1.cmp(&b.1));
+
+        let x_min = tiles_data.keys().min_by(|a, b| a.0.cmp(&b.0));
+        let y_min = tiles_data.keys().min_by(|a, b| a.1.cmp(&b.1));
+
+        println!("============");
+        println!(
+            "For region {:?}, x min: {:?}, y min: {:?}, x max: {:?}, y max: {:?}",
+            columns[pos.0][pos.1], x_min, y_min, x_max, y_max
+        );
+
+        // for rotation in [
+        //     (-DIRECTIONS[0].1, DIRECTIONS[0].0),
+        //     ((-DIRECTIONS[1].1, DIRECTIONS[1].0)),
+        //     ((-DIRECTIONS[2].1, DIRECTIONS[2].0)),
+        //     ((-DIRECTIONS[3].1, DIRECTIONS[3].0)),
+        // ] {
+        let direction = DIRECTIONS[3];
+
+        let mut sides: Vec<(usize, usize)> = vec![];
+        let mut sides_count = 0;
+        for col_index in 0..columns.len() {
+            for row_index in 0..columns[col_index].len() {
+                // Count the number of non-neighbors in a row. Increment count if there is a gap.
+
+                if let Some(pos) = tiles_data.get(&(col_index, row_index)) {
+                    // If position is in the region..
+                    let mark = columns[col_index][row_index];
+                    // let neighbors = get_neighbors(
+                    //     columns[col_index][row_index],
+                    //     (col_index, row_index),
+                    //     &columns,
+                    // );
+                    // let tile_to_check = (col_index+ direction.0, col_index + direction.1);
+                    let tile_to_check = (
+                        col_index as isize + direction.0,
+                        row_index as isize + direction.1,
+                    );
+
+                    println!(
+                        "Checking direction {:?}. Neighbor of {} {:?} tile. Neighbor: {:?}",
+                        direction, pos.mark, pos.pos, tile_to_check,
+                    );
+                    // wait_for_input(false);
+                    if is_within_bounds(
+                        tile_to_check.0,
+                        tile_to_check.1,
+                        columns.len(),
+                        columns[0].len(),
+                    ) {
+                        if DEBUG {
+                            println!("{:?}Is is within bounds.", tile_to_check);
+                        }
+                        // If tile_to_check is not a neighbor (the same mark), a new edge is found.
+                        if mark != columns[tile_to_check.0 as usize][tile_to_check.1 as usize] {
+                            // Check sides.last() if it is on the same row, and if it is next to tile_to_check
+                            println!("Sides: {:?}", sides);
+                            let prev_tile = sides.last();
+
+                            println!("prev tile: {:?}", prev_tile);
+                            if let Some(prev_tile) = prev_tile {
+                                let on_same_row = tile_to_check.0 as usize == prev_tile.0;
+                                let is_neighbor =
+                                    (tile_to_check.1 - prev_tile.1 as isize).abs() == 1;
+
+                                println!(
+                                    "prev tile: {:?}, tile_to_check: {:?}. same row: {}, is_neighbor: {}",
+                                    prev_tile, tile_to_check, on_same_row, is_neighbor
+                                );
+
+                                if !on_same_row || !is_neighbor {
+                                    sides_count += 1;
+                                }
+                            } else {
+                                sides_count += 1;
+                            }
+
+                            println!("Adding tile_to_check to sides: {:?} ", tile_to_check);
+                            sides.push((tile_to_check.0 as usize, tile_to_check.1 as usize));
+                            println!("sides after push: {:?}", sides);
+
+                            if DEBUG {
+                                print_map_animate(
+                                    &columns,
+                                    map_height,
+                                    map_width,
+                                    // (0, 0),
+                                    (tile_to_check.0 as usize, tile_to_check.1 as usize),
+                                    true,
+                                    columns[tile_to_check.0 as usize][tile_to_check.1 as usize],
+                                    &region_tiles,
+                                    &sides,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        println!("sides count: {}", sides_count);
+        regions_costs.insert(pos, (columns[pos.0][pos.1], sides_count));
     }
-    println!("Total cost: {total_cost}")
+
+    for (mark, cost) in regions_costs.values() {
+        println!("{mark}, {cost}");
+    }
+
+    // println!("\n\n\n\n\n\n\n\n");
+    // print_map_animate(
+    //     &columns,
+    //     map_height,
+    //     map_width,
+    //     // *sides.index(map_width + 1),
+    //     (0, 0),
+    //     false,
+    //     columns[pos.0][pos.1],
+    //     &region_tiles,
+    //     &sides,
+    // );
+
+    // Iterate over the grid, row by row. for each value
+    // }
 }
