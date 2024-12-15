@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::read_to_string, ops::Index};
+use std::{collections::HashMap, fs::read_to_string};
 use utils::{
     get_neighbors, is_within_bounds, print_map_animate, wait_for_input, DEBUG, DIRECTIONS, TEST,
 };
@@ -7,7 +7,7 @@ mod utils {
     use std::{io, isize, thread, time};
     pub const TICKER_SPEED: u64 = 40;
     pub const DEBUG: bool = false;
-    pub const TEST: bool = true;
+    pub const TEST: bool = false;
     pub const VIEWPORT_HEIGHT: usize = 30;
     pub const VIEWPORT_WIDTH: usize = 30;
     pub const PAUSE_ON_EACH_FRAME: bool = false;
@@ -147,7 +147,7 @@ fn main() {
     //
 
     let file_path = if TEST {
-        "./test_input.txt"
+        "./test_input2.txt"
     } else {
         "./input.txt"
     };
@@ -207,25 +207,6 @@ fn main() {
             None => unreachable!("Current pos undefined.."),
         };
 
-        if DEBUG {
-            println!("Current mark: {current_mark}");
-
-            //
-            // print_map_animate(
-            //     &columns,
-            //     map_height,
-            //     map_width,
-            //     current_pos,
-            //     current_mark,
-            //     &processed_tiles,
-            //     &regions
-            //         .get(&current_start_position)
-            //         .unwrap()
-            //         .iter()
-            //         .map(|(&key, _)| key)
-            //         .collect(),
-            // );
-        }
         processed_tiles.push(current_pos); // Add to processed_tiles so it doesn't get added as a starting point for a new region.
         let (neighbors, _out_of_bounds_count) = get_neighbors(current_mark, current_pos, &columns);
         // Insert into or create a map for current_pos and its data for the current region.
@@ -299,26 +280,26 @@ fn main() {
         }
     }
 
-    println!("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-
     // 1. Disregard any position without neighbors.
     // 2. Sort the region tiles.
     // 3. Count the sides by going line by line, and column by column.
     // Only count one of the sides, moving forward. Always count first and last sides.
     // Up -> down, down-> up. Left-> right, right -> left
 
-    println!("Using file: {file_path}");
-    print_map_animate(
-        &columns,
-        map_height,
-        map_width,
-        (0, 0),
-        false,
-        columns[0][0],
-        &vec![],
-        &vec![],
-    );
-
+    if DEBUG {
+        println!("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+        println!("Using file: {file_path}");
+        print_map_animate(
+            &columns,
+            map_height,
+            map_width,
+            (0, 0),
+            false,
+            columns[0][0],
+            &vec![],
+            &vec![],
+        );
+    }
     let get_position_cost = |pos: &RegionPosData,
                              col_index: usize,
                              row_index: usize,
@@ -420,41 +401,51 @@ fn main() {
             // wait_for_input(false);
             // let prev_tile = sides.last();
             if let Some(prev_tile) = prev_tile {
-                // TODO: on_same_row and is_neighbor works different for vertical and horizontal checks.
-                // direction
-                let (on_same_row, is_neighbor) = match direction {
+                // TODO : The is_neighbor doesn't work horizontal for X O example.
+                // It adds outside parameter even if it's already added.
+
+                let ((on_same_row, is_neighbor), outside_added) = match direction {
                     (0, _) => (
-                        tile_to_check.1 == prev_tile.1,
-                        (tile_to_check.0 - prev_tile.0 as isize).abs() == 1,
+                        (
+                            tile_to_check.1 == prev_tile.1,
+                            (tile_to_check.0 - prev_tile.0 as isize).abs() == 1,
+                        ),
+                        false, // sides
+                               //     .iter()
+                               //     .any(|pos| !is_within_bounds(pos.0, pos.1, map_height, map_width)),
                     ),
                     (_, 0) => (
-                        tile_to_check.0 == prev_tile.0,
-                        (tile_to_check.1 - prev_tile.1 as isize).abs() == 1,
+                        (
+                            tile_to_check.0 == prev_tile.0,
+                            (tile_to_check.1 - prev_tile.1 as isize).abs() == 1,
+                        ),
+                        false, // sides
+                               //     .iter()
+                               //     .any(|pos| !is_within_bounds(pos.0, pos.1, map_height, map_width)),
                     ),
                     _ => unreachable!("Direction mismatch!"),
                 };
 
-                // println!(
-                //     "{} == {} and {} - {} for direction: {:?}",
-                //     tile_to_check.1, prev_tile.1, tile_to_check.0, prev_tile.0, direction
-                // );
-                println!(
+                if DEBUG {
+                    println!(
                     "direction {:?} prev tile: {:?}, tile_to_check: {:?}. same row: {}, is_neighbor: {}. Adding count: {}, side count: {}",direction,
                     prev_tile, tile_to_check, on_same_row, is_neighbor, (!on_same_row || !is_neighbor),sides_count
                 );
-                print_map_animate(
-                    &columns,
-                    map_height,
-                    map_width,
-                    // (0, 0),
-                    pos.pos,
-                    true,
-                    pos.mark,
-                    &region_tiles,
-                    &sides,
-                );
-                wait_for_input(false);
-                if !on_same_row || !is_neighbor {
+                    println!("Sides count:{sides_count}");
+                    print_map_animate(
+                        &columns,
+                        map_height,
+                        map_width,
+                        // (0, 0),
+                        pos.pos,
+                        true,
+                        pos.mark,
+                        &region_tiles,
+                        &sides,
+                    );
+                }
+                // wait_for_input(false);
+                if !outside_added && (!on_same_row || !is_neighbor) {
                     *sides_count += 1;
                 }
             } else {
@@ -466,8 +457,14 @@ fn main() {
         // }
     };
 
-    let mark_to_check = 'C';
-    let mut regions_costs: HashMap<(usize, usize), (char, usize)> = HashMap::new();
+    struct CostData {
+        mark: char,
+        fence_count: usize,
+        area: usize,
+    }
+
+    let mark_to_check = 'E';
+    let mut regions_costs: HashMap<(usize, usize), CostData> = HashMap::new();
     for (_index, (pos, tiles_data)) in regions.into_iter().enumerate() {
         if DEBUG {
             if mark_to_check != columns[pos.0][pos.1] {
@@ -476,6 +473,8 @@ fn main() {
         }
 
         let region_tiles: Vec<(usize, usize)> = tiles_data.keys().map(|pos| *pos).collect();
+        let region_area = region_tiles.len();
+        let region_mark = columns[pos.0][pos.1];
         // Get the highest x and y value for the region.
         let x_max = tiles_data.keys().max_by(|a, b| a.0.cmp(&b.0));
         let y_max = tiles_data.keys().max_by(|a, b| a.1.cmp(&b.1));
@@ -507,6 +506,7 @@ fn main() {
         for col_index in 0..columns.len() {
             for row_index in 0..columns[col_index].len() {
                 // Count the number of non-neighbors in a row. Increment count if there is a gap.
+                let (col_index, row_index) = (row_index, col_index);
                 if let Some(pos) = tiles_data.get(&(col_index, row_index)) {
                     get_position_cost(
                         pos,
@@ -534,10 +534,19 @@ fn main() {
 
         regions_costs
             .entry(pos)
-            .and_modify(|(_char, size)| {
-                *size += sides_count;
+            .and_modify(|cost_data| {
+                cost_data.fence_count += sides_count;
+                // *size += sides_count;
             })
-            .or_insert((columns[pos.0][pos.1], sides_count));
+            .or_insert(CostData {
+                area: region_area,
+                mark: region_mark,
+                fence_count: sides_count,
+            });
+
+        // .or_insert((columns[pos.0][pos.1], RegionPosData: {
+
+        // }));
         // regions_costs.insert(pos, (columns[pos.0][pos.1], sides_count));
         ///////////////////////////////////
         // Second direction.
@@ -568,10 +577,15 @@ fn main() {
         }
         regions_costs
             .entry(pos)
-            .and_modify(|(_char, size)| {
-                *size += sides_count;
+            .and_modify(|cost_data| {
+                cost_data.fence_count += sides_count;
+                // *size += sides_count;
             })
-            .or_insert((columns[pos.0][pos.1], sides_count));
+            .or_insert(CostData {
+                area: region_area,
+                mark: region_mark,
+                fence_count: sides_count,
+            });
 
         ///////////////////////////////////
         // Third direction.
@@ -602,10 +616,15 @@ fn main() {
         }
         regions_costs
             .entry(pos)
-            .and_modify(|(_char, size)| {
-                *size += sides_count;
+            .and_modify(|cost_data| {
+                cost_data.fence_count += sides_count;
+                // *size += sides_count;
             })
-            .or_insert((columns[pos.0][pos.1], sides_count));
+            .or_insert(CostData {
+                area: region_area,
+                mark: region_mark,
+                fence_count: sides_count,
+            });
 
         ///////////////////////////////////
         // Forth direction.
@@ -616,7 +635,7 @@ fn main() {
         for col_index in (0..columns.len()).rev() {
             for row_index in 0..columns[col_index].len() {
                 // Count the number of non-neighbors in a row. Increment count if there is a gap.
-
+                let (col_index, row_index) = (row_index, col_index);
                 if let Some(pos) = tiles_data.get(&(col_index, row_index)) {
                     // println!("Forth col_index {}, row_index:{}", col_index, row_index);
                     get_position_cost(
@@ -636,16 +655,34 @@ fn main() {
         }
         regions_costs
             .entry(pos)
-            .and_modify(|(_char, size)| {
-                *size += sides_count;
+            .and_modify(|cost_data| {
+                cost_data.fence_count += sides_count;
+                // *size += sides_count;
             })
-            .or_insert((columns[pos.0][pos.1], sides_count));
+            .or_insert(CostData {
+                area: region_area,
+                mark: region_mark,
+                fence_count: sides_count,
+            });
     }
 
     let mut total = 0;
-    for (mark, cost) in regions_costs.values() {
-        println!("Mark {mark} cost: {cost}");
-        total += cost;
+    // for (mark, (cost, tile_count)) in regions_costs.values() {
+    //     println!("Mark {mark} cost: {cost}");
+    //     total += cost;
+    // }
+
+    for (_, cost_data) in regions_costs {
+        let product = cost_data.area * cost_data.fence_count;
+
+        // if DEBUG {
+        println!(
+            "{}: {} * {} = {}",
+            cost_data.mark, cost_data.area, cost_data.fence_count, product
+        );
+        // }
+
+        total += product
     }
 
     println!("Total cost: {total}")
