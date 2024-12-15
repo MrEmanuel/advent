@@ -1,14 +1,13 @@
 use std::{
     collections::{HashSet, VecDeque},
-    f32::consts::E,
     fs::read_to_string,
     io,
 };
 use utils::{DEBUG, TEST};
 
 mod utils {
-    pub const TEST: bool = true;
-    pub const DEBUG: bool = true;
+    pub const TEST: bool = false;
+    pub const DEBUG: bool = false;
 }
 
 struct OverridePos {
@@ -287,7 +286,9 @@ fn main() {
     let map_height = columns.first().unwrap().len();
     print_map(&columns, map_height, map_width, None);
 
-    println!("Instructions: {:?}", instructions);
+    if DEBUG {
+        println!("Instructions: {:?}", instructions);
+    }
 
     let mut robot_pos = starting_pos;
     'instructions: for instruction in instructions {
@@ -395,13 +396,9 @@ fn main() {
 
             match free_space_pos {
                 Some(free_pos) => {
-                    // println!("Found free space at: {:?}", free_pos);
                     // if we found a crate, update the empty position with it.
                     if found_crates > 0 {
-                        // columns[free_pos.0 as usize][free_pos.1 as usize] = 'O';
-                        println!("free pos: {:?}", free_pos);
                         let mut prev_pos = free_pos;
-                        // crates_to_move.push((robot_pos.0 as isize, robot_pos.1 as isize));
                         for crate_index in (0..crates_to_move.len()).rev() {
                             let crate_pos = crates_to_move[crate_index];
                             let crate_mark = columns[crate_pos.0 as usize][crate_pos.1 as usize];
@@ -484,8 +481,6 @@ fn main() {
                 }
                 // Vertical movement..
                 _ => {
-                    println!("Matched {}", new_pos_mark);
-
                     if new_pos_mark != '[' && new_pos_mark != ']' {
                         if DEBUG {
                             println!("Early return..");
@@ -505,18 +500,18 @@ fn main() {
                         _ => unreachable!("Couldn't find [ or ], found {new_pos_mark} instead.."),
                     };
 
-                    println!("Other half: {:?}", other_half);
-
                     // Walk the tree of crate-chars ] or [
                     let is_ok1 =
                         set_crates_to_move(&columns, &mut crates_to_move, new_pos, direction);
                     let is_ok2 =
                         set_crates_to_move(&columns, &mut crates_to_move, other_half, direction);
                     if !is_ok1 || !is_ok2 {
-                        println!(
-                            "Crates {:?} and {:?} are NOT ok to move!",
-                            new_pos, other_half
-                        );
+                        if DEBUG {
+                            println!(
+                                "Crates {:?} and {:?} are NOT ok to move!",
+                                new_pos, other_half
+                            );
+                        }
                         crates_to_move = vec![];
                         continue 'instructions; // Go to next instruction
 
@@ -527,11 +522,6 @@ fn main() {
                     }
                 }
             }
-
-            println!(
-                "Perform vertical movement.., crates_to_move: {:?}",
-                crates_to_move
-            );
 
             if crates_to_move.is_empty() {
                 match free_space_pos {
@@ -561,39 +551,19 @@ fn main() {
                     crates_to_move.sort_by(|a, b| (a.1 as usize).cmp(&(b.1 as usize)));
                 }
 
-                println!("Crates to move sorted: {:?}", crates_to_move);
-
                 while !crates_to_move.is_empty() {
                     let crate1 = crates_to_move.pop().unwrap();
-                    // let crate2 = crates_to_move.pop_front().unwrap();
-
                     let size_before = moved_crates.len();
                     moved_crates.insert(crate1);
 
-                    // moved_crates.insert(crate2);
                     if moved_crates.len() == size_before {
                         continue;
                     }
 
                     let crate1_mark = columns[crate1.0 as usize][crate1.1 as usize];
-                    // let crate2_mark = columns[crate2.0 as usize][crate2.1 as usize];
-                    // Move each crate 1 step in the direction..
-
-                    println!("Moving crate {}, {:?}", crate1_mark, crate1);
-                    println!("------ Crates to move sorted: {:?}", crates_to_move);
-
-                    // Move crate mark to prev pos.
-
                     let crate1_new_pos = (crate1.0 + direction.0, crate1.1 + direction.1);
-                    // let crate2_new_pos = (crate2.0 + direction.0, crate2.1 + direction.1);
-                    println!("New pos crate1: {:?}", crate1_new_pos,);
                     columns[crate1.0 as usize][crate1.1 as usize] = '.';
-                    // columns[crate2.0 as usize][crate2.1 as usize] = '.';
                     columns[crate1_new_pos.0 as usize][crate1_new_pos.1 as usize] = crate1_mark;
-                    // columns[crate2_new_pos.0 as usize][crate2_new_pos.1 as usize] = crate2_mark;
-                    // prev_pos = crate_pos;
-                    // prev_mark = crate_mark;
-                    // print_map(&columns, map_height, map_width, None);
                 }
 
                 // Move robot.
@@ -611,16 +581,16 @@ fn main() {
         }
     }
 
-    print_map(&columns, map_height, map_width, None)
+    print_map(&columns, map_height, map_width, None);
 
-    // let mut total = 0;
-    // for x in 0..columns.len() {
-    //     for y in 0..columns[x].len() {
-    //         let mark = columns[x][y];
-    //         if mark == 'O' {
-    //             total += (100 * y) + x;
-    //         }
-    //     }
-    // }
-    // println!("Total: {}", total);
+    let mut total = 0;
+    for x in 0..columns.len() {
+        for y in 0..columns[x].len() {
+            let mark = columns[x][y];
+            if mark == '[' {
+                total += (100 * y) + x;
+            }
+        }
+    }
+    println!("Total: {}", total);
 }
