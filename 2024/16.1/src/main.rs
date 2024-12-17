@@ -7,8 +7,8 @@ use std::{
 };
 #[derive(Clone, Debug)]
 struct Cell {
-    row: usize,
-    col: usize,
+    x: usize,
+    y: usize,
     is_path: bool,
     valid_neighbors: Vec<(usize, usize)>,
 }
@@ -58,11 +58,11 @@ fn add_color(char: char, color: &str) -> String {
     }
 }
 
-fn print_map(grid: &Grid<char>, overrides: &Vec<(usize, usize)>) {
-    for x in 0..grid.rows() {
+fn print_map(grid: &Grid<char>, overrides: &Vec<((usize, usize), usize)>) {
+    for y in 0..grid.rows() {
         let mut line: Vec<String> = vec![];
-        for y in 0..grid.cols() {
-            let val_to_push = match overrides.iter().find(|pos| pos.0 == x && pos.1 == y) {
+        for x in 0..grid.cols() {
+            let val_to_push = match overrides.iter().find(|pos| pos.0 .0 == x && pos.0 .1 == y) {
                 Some(_) => add_color(grid[(x, y)], "red"),
                 None => grid[(x, y)].to_string(),
             };
@@ -98,62 +98,151 @@ fn main() -> io::Result<()> {
     let content = read_to_string(file_path)?;
     let content_vec: Vec<char> = content.chars().filter(|&val| val != '\n').collect();
     drop(content);
-    let char_grid = Grid::from_vec(content_vec, row_length);
+    let char_grid = Grid::from_vec_with_order(content_vec, row_length, Order::ColumnMajor);
 
     println!("Row Length: {}", row_length);
     let mut cells: Vec<Cell> = vec![];
     let mut start_position = (0, 0);
     let mut end_position = (0, 0);
     // Make cells and put in cell_grid.
-    for row_index in 0..char_grid.rows() {
-        for col_index in 0..char_grid.cols() {
-            let mark = char_grid[(row_index, col_index)];
+    for y_row_index in 0..char_grid.cols() {
+        for x_col_index in 0..char_grid.rows() {
+            let mark = char_grid[(x_col_index, y_row_index)];
             match mark {
                 'S' => {
                     // found start
-                    start_position = (row_index, col_index);
+                    start_position = (x_col_index, y_row_index);
                 }
                 'E' => {
                     //found end
-                    end_position = (row_index, col_index);
+                    end_position = (x_col_index, y_row_index);
                 }
                 _ => {}
             }
             // Make cell.
             let mut cell = Cell {
-                col: col_index,
-                row: row_index,
+                y: y_row_index,
+                x: x_col_index,
                 is_path: mark == '.',
                 valid_neighbors: vec![],
             };
             for delta in DIRECTIONS {
                 if (cell.is_path || mark == 'S')
-                    && is_valid_move(&char_grid, (row_index as isize, col_index as isize), delta)
+                    && is_valid_move(
+                        &char_grid,
+                        (x_col_index as isize, y_row_index as isize),
+                        delta,
+                    )
                 {
-                    let neighbor_pos = (row_index as isize + delta.0, col_index as isize + delta.1);
+                    let neighbor_pos = (
+                        x_col_index as isize + delta.0,
+                        y_row_index as isize + delta.1,
+                    );
                     cell.valid_neighbors
                         .push((neighbor_pos.0 as usize, neighbor_pos.1 as usize));
                 }
             }
 
-            let mut overrides = vec![(cell.row, cell.col)];
+            let mut overrides = vec![(cell.x, cell.y)];
             overrides.extend(cell.valid_neighbors.iter());
 
-            println!("Adding {} valid neighbors", cell.valid_neighbors.len());
-            print_map(&char_grid, &overrides);
-
+            println!(
+                "For cell {:?}, Adding {} valid neighbors",
+                (cell.x, cell.y),
+                cell.valid_neighbors.len()
+            );
+            // print_map(&char_grid, &overrides.iter().map(|pos| (*pos, 0)).collect());
+            // wait_for_input(false);
             cells.push(cell);
         }
     }
+    println!("\n\n\n");
 
-    let mut cell_grid = Grid::from_vec(cells, row_length);
-    println!(
-        "Start pos: {:?},{:?}",
-        start_position, cell_grid[start_position]
-    );
-    println!("end pos: {:?},{:?}", end_position, cell_grid[end_position]);
+    let cell_grid = Grid::from_vec_with_order(cells, row_length, Order::ColumnMajor);
+    // println!(
+    //     "Start pos: {:?},{:?}",
+    //     start_position, cell_grid[start_position]
+    // );
+    // println!("end pos: {:?},{:?}", end_position, cell_grid[end_position]);
 
     // Start implementing Wave Function Collapse Algorithm!
+
+    fn get_cheapest_neighbor(
+        pos: (usize, usize),
+        current_direction: (isize, isize),
+        cell_grid: &Grid<Cell>,
+    ) -> Option<((usize, usize), usize)> {
+        let current_cell = &cell_grid[(pos.0, pos.1)];
+        let mut cheapest: Option<((usize, usize), usize)> = None;
+
+        println!("Cell valid neighbors: {:?}", current_cell.valid_neighbors);
+        for index in 0..current_cell.valid_neighbors.len() {
+            let neighbor_pos = current_cell.valid_neighbors[index];
+            // let len = cell_grid[pos].valid_neighbors.len();
+            let neighbor_direction = (
+                neighbor_pos.0 as isize - pos.0 as isize,
+                neighbor_pos.1 as isize - pos.1 as isize,
+            );
+            println!(
+                " current_directionL {:?}, neighbor_direction: {:?}",
+                current_direction, neighbor_direction
+            );
+            let is_turn = neighbor_direction != current_direction;
+            let neighbor_cost: usize = if is_turn { 1001 } else { 1 };
+
+            println!("Neighbor {:? } Is turn: {}", neighbor_pos, is_turn);
+
+            match cheapest {
+                Some(cheap_candidate) => {
+                    // println!("Match cheapest: {:?}");
+                    if neighbor_cost < cheap_candidate.1 {
+                        println!(
+                            "Setting cheapest pos and cost {:?}",
+                            (neighbor_pos, neighbor_cost)
+                        );
+                        cheapest = Some((neighbor_pos, neighbor_cost));
+                    } else if neighbor_cost == cheap_candidate.1 {
+                        // Pick one at random here?
+                        // println!("Neighbors are of the same cost..");
+
+                        let random_index = rand::thread_rng().gen_range(0..2);
+                        // println!("Random integer: {}", random_index);
+                        match random_index {
+                            0 => {
+                                // if random_index == 0, set the new pos as cheapest
+                                // println!("Setting {:?} as cheapest", (pos, cost));
+                                cheapest = Some((neighbor_pos, neighbor_cost));
+                            }
+
+                            _ => {
+                                // println!("Keeping {:?} as cheapest", cheapest);
+
+                                // If random_index == 1 Choose the current pos
+                            }
+                        }
+                    }
+                }
+                None => {
+                    cheapest = {
+                        // If no value is set, set current value.
+                        Some((neighbor_pos, neighbor_cost))
+                    }
+                }
+            };
+        }
+
+        println!("Cheapest neighbor is: {:?}", cheapest);
+        match cheapest {
+            Some(data) => Some(data),
+            None => {
+                println!(
+                    "cheapest neighbor not found for position {:?}",
+                    (current_cell.x, current_cell.y)
+                );
+                None
+            }
+        }
+    }
 
     fn get_smallest_neighbor(
         pos: (usize, usize),
@@ -199,17 +288,18 @@ fn main() -> io::Result<()> {
             None => {
                 println!(
                     "Smallest neighbor not found for position {:?}",
-                    (cell.row, cell.col)
+                    (cell.x, cell.y)
                 );
                 None
             }
         }
     };
     // 1. For start position, choose the neighbor with least entropy, i.e least number of valid neighbors.
-    let mut path: Vec<(usize, usize)> = vec![];
+    let mut path: Vec<((usize, usize), usize)> = vec![];
     let mut grid_copy = cell_grid.clone(); //
     let mut next_pos = start_position;
     let mut iteration_count = 0;
+    let mut current_direction = DIRECTIONS[1];
     loop {
         // let next_cell = &mut grid_copy[next_pos];
 
@@ -219,21 +309,19 @@ fn main() -> io::Result<()> {
 
         // TODO: Check if position is E
         if !grid_copy[next_pos].is_path
-            && char_grid[(grid_copy[next_pos].row, grid_copy[next_pos].col)] == 'E'
+            && char_grid[(grid_copy[next_pos].x, grid_copy[next_pos].y)] == 'E'
         {
             println!(
                 "Found E at {:?}",
-                (grid_copy[next_pos].row, grid_copy[next_pos].col)
+                (grid_copy[next_pos].x, grid_copy[next_pos].y)
             );
 
             break;
         }
 
-        println!("Next pos is: {:?}", next_pos);
-        // Pick a path at random
-        let smallest_neighbor = get_smallest_neighbor(next_pos, &grid_copy);
-        match smallest_neighbor {
-            Some(smallest_neighbor) => {
+        let cheapest_neighbor = get_cheapest_neighbor(next_pos, current_direction, &grid_copy);
+        match cheapest_neighbor {
+            Some(cheapest_neighbor) => {
                 // Remove next_pos from neighbords valid_neighbors array
 
                 // TODO: Check if we're using grid_copy and cell_grid correctly..
@@ -244,6 +332,7 @@ fn main() -> io::Result<()> {
                     .collect();
 
                 for neighbor in neighbors_to_update {
+                    // println!("Neighbor: {:?}", neighbor);
                     if let Some(neighbor_cell) = grid_copy.get_mut(neighbor.0, neighbor.1) {
                         neighbor_cell.valid_neighbors.retain(|pos| pos != &next_pos);
                     }
@@ -252,12 +341,21 @@ fn main() -> io::Result<()> {
                 // grid_copy[next_pos].valid_neighbors =
                 grid_copy[next_pos]
                     .valid_neighbors
-                    .retain(|pos| pos != &smallest_neighbor);
+                    .retain(|pos| pos != &cheapest_neighbor.0);
+                println!(
+                    "Valid neighbors of current_pos updated to: {:?}, should reove {:?}",
+                    grid_copy[next_pos].valid_neighbors, cheapest_neighbor.0
+                );
 
-                next_pos = smallest_neighbor;
-                println!("Smallest neighbor is: {:?}", smallest_neighbor);
+                let new_direction = (
+                    cheapest_neighbor.0 .0 as isize - next_pos.0 as isize,
+                    cheapest_neighbor.0 .1 as isize - next_pos.1 as isize,
+                );
+                current_direction = new_direction;
+                next_pos = cheapest_neighbor.0;
+                path.push(cheapest_neighbor);
+                println!("New direction: {:?}", new_direction);
                 println!("=====Next cell will be: {:?}", grid_copy[next_pos]);
-                path.push(next_pos);
             }
 
             None => {
@@ -265,12 +363,20 @@ fn main() -> io::Result<()> {
 
                 for _ in 0..path.len() {
                     let prev_path = path.pop().unwrap();
-                    let cell = &grid_copy[prev_path];
+                    let cell = &grid_copy[prev_path.0];
+                    println!("Backtracking to cell.. {:?}", cell);
+
                     if !cell.valid_neighbors.is_empty() {
-                        println!("Backtracking to cell: {:?}", cell);
-                        next_pos = prev_path;
-                        path.push(next_pos);
+                        println!("Resetting to cell: {:?}", cell);
+                        next_pos = prev_path.0;
+                        path.push(prev_path);
                     }
+                }
+                // If path is empty, reset to inital starting position and direction.
+                if path.is_empty() {
+                    next_pos = start_position;
+                    current_direction = DIRECTIONS[1];
+                    // path.push((start_position, 0))
                 }
 
                 println!("path: {:?}", path);
@@ -280,13 +386,18 @@ fn main() -> io::Result<()> {
 
         print_map(&char_grid, &path);
         println!("Path length: {:?}", path);
-        if path.len() > 2 && path.index(path.len() - 2) == &next_pos {
+        if path.len() > 2 && path.index(path.len() - 2).0 == next_pos {
             println!("No movement made.. breaking loop.");
             break;
         }
         wait_for_input(false);
     }
 
-    println!("Found E in {} iterations!", iteration_count);
+    let mut cost = 0;
+    for pos in &path {
+        cost += pos.1;
+    }
+    println!("Finished! Found E in {} iterations!", iteration_count);
+    println!("Path length: {:?}, path cost: {:?}", path.len(), cost);
     return Ok(());
 }
