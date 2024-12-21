@@ -1,129 +1,15 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    isize,
+mod utils;
+
+use std::collections::HashSet;
+use utils::{
+    add_color, get_cheapest_neighbor, get_distance_to_node, get_neighbor_positions, print_map,
+    wait_for_input, Grid, DIRECTIONS, START_DIST,
 };
 
+// Implement BFS, breath first algorithm.
 fn main() {
-    const DEBUG: bool = false;
+    const DEBUG: bool = true;
     const TEST: bool = true;
-    type Grid = HashMap<(isize, isize), Pos>;
-    #[derive(Eq, Hash, PartialEq, Debug)]
-    pub struct Pos {
-        x: isize,
-        y: isize,
-        seen: bool,
-    }
-    impl Pos {
-        fn adjecent(&self, grid: &Grid) -> Vec<(isize, isize)> {
-            let mut pos: Vec<(isize, isize)> = vec![];
-            for dir in DIRECTIONS {
-                let x = self.x + dir.0;
-                let y = self.y + dir.1;
-                match grid.get(&(x, y)) {
-                    Some(p) => {
-                        if !p.seen {
-                            pos.push((x, y));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-
-            return pos;
-        }
-    }
-
-    type Parents = HashMap<(isize, isize), (isize, isize)>;
-
-    fn bfs(start: (isize, isize), end: (isize, isize), grid: &mut Grid) -> Parents {
-        let mut queue: VecDeque<(isize, isize)> = VecDeque::from(vec![start]);
-        let mut parents: Parents = HashMap::new();
-        if DEBUG {
-            println!("Running bfs algorithm..");
-        }
-        while let Some(curr) = queue.pop_front() {
-            let current_pos = grid.get(&curr);
-
-            let (x_current, y_current, neighbors) = {
-                let pos = match current_pos {
-                    Some(pos) => pos,
-                    None => continue,
-                };
-                if (pos.x, pos.x) == end {
-                    continue;
-                };
-                let neighbors = pos.adjecent(&grid);
-                (pos.x, pos.y, neighbors)
-            };
-
-            for i in 0..neighbors.len() {
-                let adjecent_pos = grid.get_mut(&neighbors[i]);
-                match adjecent_pos {
-                    Some(next) => {
-                        if !next.seen {
-                            next.seen = true;
-                            queue.push_back((next.x, next.y));
-                            parents.insert((next.x, next.y), (x_current, y_current));
-                        } else {
-                        }
-                    }
-                    None => {}
-                }
-            }
-        }
-        return parents;
-    }
-
-    fn reconstruct_path(parents: &mut Parents, end: (isize, isize)) -> Vec<(isize, isize)> {
-        let mut path = vec![];
-        let mut curr = end;
-        if DEBUG {
-            println!("Reconstructing path..",);
-        }
-        while let Some(parent) = parents.get(&curr) {
-            if DEBUG {
-                println!("Pushing parent: {:?}", parent);
-            }
-            path.push(*parent);
-            curr = *parent;
-        }
-
-        path.reverse();
-        return path;
-    }
-
-    fn p1(
-        start: Option<(isize, isize)>,
-        end: Option<(isize, isize)>,
-        positions: &mut Grid,
-    ) -> Option<usize> {
-        match (start, end) {
-            (Some(start), Some(end)) => {
-                if DEBUG {
-                    println!("Start: {:?}, End: {:?}", start, end);
-                }
-                let mut parents = bfs(start, end, positions);
-                if DEBUG {
-                    println!("bfs produced parents:{:?}", parents);
-                }
-                let path = reconstruct_path(&mut parents, end);
-                if path.len() > 0 {
-                    Some(path.len())
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-
-    const DIRECTIONS: [(isize, isize); 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
-    let mut start: Option<(isize, isize)> = None;
-    let mut end: Option<(isize, isize)> = None;
-    let mut positions: Grid = HashMap::new();
-
-    // let start = (1, 1);
-    // let end = (3, 12);
 
     let file = if TEST {
         "./test_input.txt"
@@ -131,69 +17,136 @@ fn main() {
         "input.txt"
     };
 
+    // TODO: Djiekstras algorithm..
+    // 0. Prepare all nodes.
+    // 1. Create a set of all unvisited nodes.
+    // 2. Assign infinity to all nodes except starting node.
+
+    let mut unvisited: HashSet<(usize, usize)> = HashSet::new();
     println!("Reading file {file}");
     let content = std::fs::read_to_string(file).unwrap();
-    for (x_index, val) in content.lines().enumerate() {
-        for (y_index, char) in val.chars().enumerate() {
-            match char {
+
+    // Get width a height
+    let mut map_height = 0;
+    let mut map_width = 0;
+    for (i, line) in content.lines().enumerate() {
+        map_width += 1;
+        for _ in 0..line.len() {
+            if i == 0 {
+                map_height += 1;
+            } else {
+                continue;
+            }
+        }
+    }
+
+    println!("Map height: {} and width: {}", map_height, map_width);
+
+    let mut start_pos = (0, 0);
+    let mut end_pos = (0, 0);
+
+    let mut map = Grid::new(map_width, map_height);
+
+    for (y_index, val) in content.lines().enumerate() {
+        for (x_index, mark) in val.chars().enumerate() {
+            // Add node to unvisted set.
+            if mark == '#' {
+                continue;
+            }
+            unvisited.insert((x_index, y_index));
+            map.update_mark(x_index, y_index, mark);
+            match mark {
                 'S' => {
-                    positions.insert(
-                        (x_index as isize, y_index as isize),
-                        Pos {
-                            x: x_index as isize,
-                            y: y_index as isize,
-                            seen: true,
-                        },
-                    );
-                    start = Some((x_index as isize, y_index as isize));
-                    // queue.push_back((x_index as isize, y_index as isize))
+                    start_pos = (x_index, y_index);
+                    map.update_dist(x_index, y_index, 0);
                 }
-                'E' => {
-                    positions.insert(
-                        (x_index as isize, y_index as isize),
-                        Pos {
-                            x: x_index as isize,
-                            y: y_index as isize,
-                            seen: false,
-                        },
-                    );
-                    end = Some((x_index as isize, y_index as isize));
-                }
-                '.' => {
-                    positions.insert(
-                        (x_index as isize, y_index as isize),
-                        Pos {
-                            x: x_index as isize,
-                            y: y_index as isize,
-                            seen: false,
-                        },
-                    );
-                }
+                'E' => end_pos = (x_index, y_index),
                 _ => {}
             }
         }
     }
 
+    // Implement Djikstra
+    // let current_pos = start_pos;
+    // 0. If unvisited is empty, or current_node == end_pos, break
+
     if DEBUG {
-        println!("Created positions: {:?}", positions);
+        println!("Checking {} nodes.", unvisited.len());
     }
 
-    println!("Path is {:?} long", p1(start, end, &mut positions).unwrap())
+    while !unvisited.is_empty() {
+        if DEBUG {
+            println!("")
+        }
+        if unvisited
+            .iter()
+            .all(|pos| map.get_node(*pos).dist == START_DIST)
+        {
+            println!("All {} unvisited nodes unreachable.", unvisited.len());
+            break;
+        }
 
-    // Read all information into a Grid.
-    // BFS algorithm.
-    // Implicit graph by only storing coordinates and looking up state "on the fly"
+        // 1. Update all unvisited neighbor nodes' distances.
+        let current_pos = unvisited
+            .iter()
+            .min_by_key(|pos| map.get_node(**pos).dist)
+            .copied();
 
-    // pub fn adjecent(pos: Pos) -> impl Iterator<Item = Pos> {}
+        if DEBUG {
+            println!("\nCurrent pos is: {:?}", current_pos);
+        }
 
-    // First in, first out queue. I.e VecDeque.
-    // Seen set, i.e a HashMap.
+        match current_pos {
+            Some(current_pos) => {
+                let current_node = map.get_node(current_pos);
+                for dir in DIRECTIONS {
+                    let neighbor_pos = (
+                        current_pos.0 as isize + dir.0,
+                        current_pos.1 as isize + dir.1,
+                    );
+                    if DEBUG {
+                        println!("Checking neighbor {:?}", neighbor_pos);
+                    }
+                    if unvisited.contains(&(neighbor_pos.0 as usize, neighbor_pos.1 as usize)) {
+                        let neighbor_node =
+                            map.get_node((neighbor_pos.0 as usize, neighbor_pos.1 as usize));
+                        let new_dist = current_node.dist + get_distance_to_node();
+                        if new_dist < neighbor_node.dist {
+                            // If new dist is shorter, update the neighbor node with it
+                            // because going through current node is faster
+                            if DEBUG {
+                                println!(
+                                    "Updating neighbor {:?} with new distance: {}",
+                                    neighbor_pos, new_dist
+                                );
+                            }
+                            // This is right!
+                            map.update_dist(
+                                neighbor_pos.0 as usize,
+                                neighbor_pos.1 as usize,
+                                new_dist,
+                            );
+                        }
+                    }
+                }
+                unvisited.remove(&current_pos);
+            }
+            None => {
+                println!("Current_node not found. Breaking while loop");
+                break;
+            }
+        }
+    }
 
-    // 0. Add start to queue and seen.
+    println!("map width and height: {}, {}", map_width, map_height);
 
-    // 1. Pop the queue.
-    // 2. If the vertice is the end, stop the loop.
-    // 3. Add all its' unseen neighbors to the queue and seen set.
-
-    // Repeat 1-2
+    let mut current_pos = start_pos;
+    let mut path = vec![start_pos];
+    while current_pos != end_pos {
+        print_map(&map, &path);
+        wait_for_input(false);
+        let next_pos = get_cheapest_neighbor(current_pos, &map);
+        current_pos = next_pos;
+        path.push(next_pos);
+    }
 }
