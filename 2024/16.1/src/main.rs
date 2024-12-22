@@ -2,14 +2,14 @@ mod utils;
 
 use std::collections::HashSet;
 use utils::{
-    add_color, get_cheapest_neighbor, get_distance_to_node, get_neighbor_positions, print_map,
-    wait_for_input, Grid, DIRECTIONS, START_DIST,
+    get_cheapest_neighbor, get_distance_and_direction_to, print_map, wait_for_input, Grid,
+    DIRECTIONS, START_DIST,
 };
 
 // Implement BFS, breath first algorithm.
 fn main() {
-    const DEBUG: bool = true;
-    const TEST: bool = true;
+    const DEBUG: bool = false;
+    const TEST: bool = false;
 
     let file = if TEST {
         "./test_input.txt"
@@ -58,7 +58,7 @@ fn main() {
             match mark {
                 'S' => {
                     start_pos = (x_index, y_index);
-                    map.update_dist(x_index, y_index, 0);
+                    map.update_dist(x_index, y_index, 0f64);
                 }
                 'E' => end_pos = (x_index, y_index),
                 _ => {}
@@ -72,8 +72,10 @@ fn main() {
 
     if DEBUG {
         println!("Checking {} nodes.", unvisited.len());
+        println!("End position is: {:?}", end_pos);
     }
 
+    // let mut path: Vec<(usize, usize)> = vec![];
     while !unvisited.is_empty() {
         if DEBUG {
             println!("")
@@ -86,10 +88,9 @@ fn main() {
             break;
         }
 
-        // 1. Update all unvisited neighbor nodes' distances.
         let current_pos = unvisited
             .iter()
-            .min_by_key(|pos| map.get_node(**pos).dist)
+            .min_by_key(|pos| map.get_node(**pos).dist as i32)
             .copied();
 
         if DEBUG {
@@ -98,6 +99,13 @@ fn main() {
 
         match current_pos {
             Some(current_pos) => {
+                if current_pos == end_pos {
+                    if DEBUG {
+                        println!("\nEnd position found! Breaking!");
+                    }
+                    break;
+                }
+
                 let current_node = map.get_node(current_pos);
                 for dir in DIRECTIONS {
                     let neighbor_pos = (
@@ -110,15 +118,30 @@ fn main() {
                     if unvisited.contains(&(neighbor_pos.0 as usize, neighbor_pos.1 as usize)) {
                         let neighbor_node =
                             map.get_node((neighbor_pos.0 as usize, neighbor_pos.1 as usize));
-                        let new_dist = current_node.dist + get_distance_to_node();
+
+                        let (dist, new_direction) = get_distance_and_direction_to(
+                            (current_pos.0 as isize, current_pos.1 as isize),
+                            neighbor_pos,
+                            current_node.direction,
+                        );
+                        let new_dist = current_node.dist + dist;
                         if new_dist < neighbor_node.dist {
                             // If new dist is shorter, update the neighbor node with it
                             // because going through current node is faster
                             if DEBUG {
                                 println!(
-                                    "Updating neighbor {:?} with new distance: {}",
-                                    neighbor_pos, new_dist
+                                    "From direction {:?}: Updating neighbor {:?} with new distance: {}",
+                                    current_node.direction,neighbor_pos, new_dist
                                 );
+                                print_map(
+                                    &map,
+                                    &vec![
+                                        (neighbor_pos.0 as usize, neighbor_pos.1 as usize),
+                                        current_pos,
+                                    ],
+                                    false,
+                                );
+                                wait_for_input(false);
                             }
                             // This is right!
                             map.update_dist(
@@ -126,10 +149,16 @@ fn main() {
                                 neighbor_pos.1 as usize,
                                 new_dist,
                             );
+                            map.update_direction(
+                                neighbor_pos.0 as usize,
+                                neighbor_pos.1 as usize,
+                                new_direction,
+                            );
                         }
                     }
                 }
                 unvisited.remove(&current_pos);
+                // path.push(current_pos);
             }
             None => {
                 println!("Current_node not found. Breaking while loop");
@@ -138,15 +167,26 @@ fn main() {
         }
     }
 
-    println!("map width and height: {}, {}", map_width, map_height);
-
-    let mut current_pos = start_pos;
-    let mut path = vec![start_pos];
-    while current_pos != end_pos {
-        print_map(&map, &path);
-        wait_for_input(false);
+    let mut current_pos = end_pos;
+    let mut path = vec![end_pos];
+    while current_pos != start_pos {
         let next_pos = get_cheapest_neighbor(current_pos, &map);
         current_pos = next_pos;
         path.push(next_pos);
     }
+
+    if DEBUG {
+        for step in path.iter().rev() {
+            print_map(&map, &vec![*step], false);
+            println!("Position cost: {}", map.get_node(*step).dist);
+            wait_for_input(false);
+        }
+    }
+
+    println!(
+        "Cost from start {:?} to reach the goal at {:?} is {}",
+        start_pos,
+        end_pos,
+        map.get_node(end_pos).dist
+    )
 }
